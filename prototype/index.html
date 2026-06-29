@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>OrbitSlash — Prototype</title>
+<style>
+  :root { --accent: #4da3ff; --xp: #ffd23f; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0e16; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; color: #e8eef7; touch-action: none; }
+  #game { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+
+  /* ---------- HUD ---------- */
+  .hud { position: fixed; pointer-events: none; z-index: 5; text-shadow: 0 1px 3px #000; }
+  #hud-tl { top: 14px; left: 16px; }
+  #hud-tr { top: 14px; right: 16px; text-align: right; }
+  #hud-bottom { bottom: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
+  .hud .row { font-size: 15px; line-height: 1.55; font-weight: 600; }
+  .bar { width: 190px; height: 12px; border-radius: 6px; background: #1c2535; overflow: hidden; margin-top: 2px; box-shadow: inset 0 0 0 1px #2c3950; }
+  .bar > span { display: block; height: 100%; transition: width .12s linear; }
+  #hp-fill { background: linear-gradient(90deg, #ff5a5a, #ff8c5a); }
+  #xp-fill { background: linear-gradient(90deg, #ffd23f, #ffe98a); }
+  .label { font-size: 11px; opacity: .7; letter-spacing: .06em; text-transform: uppercase; }
+  #coins { font-size: 18px; font-weight: 700; color: var(--xp); }
+
+  /* ---------- Overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+             flex-direction: column; background: rgba(8,12,20,.78); backdrop-filter: blur(3px); }
+  .overlay.show { display: flex; }
+  .overlay h1 { font-size: 40px; margin-bottom: 6px; letter-spacing: .02em; }
+  .overlay h2 { font-size: 24px; margin-bottom: 22px; color: var(--accent); }
+  .overlay p { opacity: .8; margin-bottom: 18px; }
+
+  .cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; max-width: 760px; }
+  .card { width: 210px; min-height: 150px; background: #131c2c; border: 2px solid #243349; border-radius: 14px;
+          padding: 18px; cursor: pointer; transition: transform .1s, border-color .1s, box-shadow .1s; text-align: left; }
+  .card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 8px 26px rgba(77,163,255,.25); }
+  .card .key { font-size: 12px; opacity: .55; }
+  .card .icon { font-size: 30px; margin: 4px 0 10px; }
+  .card .name { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .card .desc { font-size: 13px; opacity: .8; line-height: 1.4; }
+
+  .btn { pointer-events: auto; margin-top: 8px; padding: 12px 30px; font-size: 16px; font-weight: 700; color: #06101e;
+         background: var(--accent); border: none; border-radius: 10px; cursor: pointer; transition: filter .1s; }
+  .btn:hover { filter: brightness(1.1); }
+
+  #hint { position: fixed; bottom: 14px; left: 16px; z-index: 5; font-size: 12px; opacity: .45; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div id="hud-tl" class="hud">
+  <div class="label">HP</div>
+  <div class="bar"><span id="hp-fill"></span></div>
+  <div class="label" style="margin-top:8px">Level <span id="level">1</span> — XP</div>
+  <div class="bar"><span id="xp-fill"></span></div>
+</div>
+<div id="hud-tr" class="hud">
+  <div class="row">FPS <span id="fps">60</span></div>
+  <div class="row">Kills <span id="kills">0</span></div>
+</div>
+<div id="hud-bottom" class="hud">
+  <div class="label">Coins</div>
+  <div id="coins">0</div>
+</div>
+<div id="hint">WASD / Arrows / Hold Mouse / Joystick · P to pause</div>
+
+<!-- Level Up -->
+<div id="overlay-levelup" class="overlay">
+  <h1>Level Up!</h1>
+  <h2>Choose an upgrade</h2>
+  <div id="cards" class="cards"></div>
+</div>
+
+<!-- Pause -->
+<div id="overlay-pause" class="overlay">
+  <h1>Paused</h1>
+  <p>Press P or Esc to resume</p>
+  <button class="btn" id="resume-btn">Resume</button>
+</div>
+
+<!-- Game Over -->
+<div id="overlay-gameover" class="overlay">
+  <h1>Game Over</h1>
+  <h2 id="go-summary">You survived</h2>
+  <button class="btn" id="restart-btn">Restart (Enter)</button>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================================
+   CONFIG — single source of truth for tuning (becomes Godot Resources later)
+   ========================================================================= */
+const CONFIG = {
+  player: { radius: 16, speed: 260, maxHP: 100, color: "#4da3ff", accel: 0.18 },
+  sword:  { length: 70, width: 12, rotSpeed: 3.2, damage: 25, orbit: 30, color: "#cfe6ff" },
+  enemy:  { radius: 14, speed: 70, hp: 50, spawnInterval: 1.0, color: "#ff5a6e", contactDPS: 22 },
+  xp:     { radius: 6, value: 1, magnetRange: 110, magnetSpeed: 520, perLevelBase: 10 },
+  grid:   { size: 64, color: "#16202f", axis: "#1d2a3d" },
+  camera: { smooth: 6 },
+};
+
+/* =========================================================================
+   Utils
+   ========================================================================= */
+const rand  = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const TAU   = Math.PI * 2;
+
+/* =========================================================================
+   Input — keyboard, mouse, virtual joystick. One responsibility: read intent.
+   ========================================================================= */
+class Input {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.keys = new Set();
+    this.mouse = { x: 0, y: 0, down: false };
+    // Virtual joystick state
+    this.joy = { active: false, baseX: 0, baseY: 0, dx: 0, dy: 0, id: null };
+    this.onSelect = null; // callback for upgrade hotkeys 1/2/3
+
+    addEventListener("keydown", (e) => {
+      this.keys.add(e.code);
+      if (e.code === "Digit1" || e.code === "Digit2" || e.code === "Digit3")
+        this.onSelect && this.onSelect(+e.code.slice(-1) - 1);
+      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();
+    });
+    addEventListener("keyup", (e) => this.keys.delete(e.code));
+
+    canvas.addEventListener("mousedown", (e) => { this.mouse.down = true; this._setMouse(e); });
+    addEventListener("mouseup", () => this.mouse.down = false);
+    canvas.addEventListener("mousemove", (e) => this._setMouse(e));
+
+    // Touch -> virtual joystick (drag from anywhere)
+    canvas.addEventListener("touchstart", (e) => this._touchStart(e), { passive: false });
+    canvas.addEventListener("touchmove",  (e) => this._touchMove(e),  { passive: false });
+    canvas.addEventListener("touchend",   (e) => this._touchEnd(e));
+  }
+
+  _setMouse(e) {
+    const r = this.canvas.getBoundingClientRect();
+    this.mouse.x = e.clientX - r.left;
+    this.mouse.y = e.clientY - r.top;
+  }
+  _touchStart(e) {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    this.joy = { active: true, baseX: t.clientX, baseY: t.clientY, dx: 0, dy: 0, id: t.identifier };
+  }
+  _touchMove(e) {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier !== this.joy.id) continue;
+      const max = 60;
+      let dx = t.clientX - this.joy.baseX, dy = t.clientY - this.joy.baseY;
+      const len = Math.hypot(dx, dy) || 1;
+      const c = Math.min(len, max) / len;
+      this.joy.dx = (dx * c) / max; // normalized -1..1
+      this.joy.dy = (dy * c) / max;
+    }
+  }
+  _touchEnd(e) {
+    for (const t of e.changedTouches)
+      if (t.identifier === this.joy.id) this.joy = { active: false, baseX: 0, baseY: 0, dx: 0, dy: 0, id: null };
+  }
+
+  // Returns desired move direction in world space, normalized.
+  getMoveVector(player, camera) {
+    let x = 0, y = 0;
+    if (this.keys.has("KeyW") || this.keys.has("ArrowUp"))    y -= 1;
+    if (this.keys.has("KeyS") || this.keys.has("ArrowDown"))  y += 1;
+    if (this.keys.has("KeyA") || this.keys.has("ArrowLeft"))  x -= 1;
+    if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) x += 1;
+
+    if (this.joy.active && (this.joy.dx || this.joy.dy)) { x = this.joy.dx; y = this.joy.dy; }
+
+    if (x === 0 && y === 0 && this.mouse.down) {
+      const w = camera.screenToWorld(this.mouse.x, this.mouse.y);
+      const dx = w.x - player.x, dy = w.y - player.y;
+      const d = Math.hypot(dx, dy);
+      if (d > player.radius) { x = dx / d; y = dy / d; }
+    }
+    const len = Math.hypot(x, y);
+    return len > 0 ? { x: x / len, y: y / len } : { x: 0, y: 0 };
+  }
+}
+
+/* =========================================================================
+   Camera — follows player, smoothing + screen shake, world<->screen.
+   ========================================================================= */
+class Camera {
+  constructor(canvas) { this.canvas = canvas; this.x = 0; this.y = 0; this.shake = 0; this.ox = 0; this.oy = 0; }
+  follow(target, dt) {
+    const t = 1 - Math.exp(-CONFIG.camera.smooth * dt); // frame-rate independent lerp
+    this.x += (target.x - this.x) * t;
+    this.y += (target.y - this.y) * t;
+    if (this.shake > 0) {
+      const m = this.shake;
+      this.ox = rand(-m, m); this.oy = rand(-m, m);
+      this.shake = Math.max(0, this.shake - 60 * dt);
+    } else { this.ox = this.oy = 0; }
+  }
+  addShake(amount) { this.shake = Math.min(18, this.shake + amount); }
+  worldToScreen(x, y) {
+    return { x: x - this.x + this.canvas.width / 2 + this.ox, y: y - this.y + this.canvas.height / 2 + this.oy };
+  }
+  screenToWorld(x, y) {
+    return { x: x + this.x - this.canvas.width / 2 - this.ox, y: y + this.y - this.canvas.height / 2 - this.oy };
+  }
+}
+
+/* =========================================================================
+   Player — blue circle. Movement + health.
+   ========================================================================= */
+class Player {
+  constructor() {
+    const c = CONFIG.player;
+    this.x = 0; this.y = 0;
+    this.vx = 0; this.vy = 0;
+    this.radius = c.radius;
+    this.speed = c.speed;
+    this.maxHP = c.maxHP;
+    this.hp = c.maxHP;
+    this.hitFlash = 0;
+  }
+  update(dt, dir) {
+    const targetVX = dir.x * this.speed, targetVY = dir.y * this.speed;
+    // smoothed acceleration for nicer feel
+    const a = 1 - Math.pow(1 - CONFIG.player.accel, dt * 60);
+    this.vx += (targetVX - this.vx) * a;
+    this.vy += (targetVY - this.vy) * a;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    if (this.hitFlash > 0) this.hitFlash -= dt;
+  }
+  damage(amount) { this.hp = Math.max(0, this.hp - amount); this.hitFlash = 0.15; }
+}
+
+/* =========================================================================
+   Sword — rotating rectangle around player. Configurable, with trail.
+   ========================================================================= */
+class Sword {
+  constructor(player) {
+    const s = CONFIG.sword;
+    this.player = player;
+    this.angle = 0;
+    this.length = s.length;
+    this.width = s.width;
+    this.rotSpeed = s.rotSpeed;
+    this.damage = s.damage;
+    this.orbit = s.orbit;
+    this.trail = []; // tip positions for the trail effect
+  }
+  update(dt) {
+    this.angle = (this.angle + this.rotSpeed * dt) % TAU;
+    const tip = this.tip();
+    this.trail.push({ x: tip.x, y: tip.y, life: 0.18 });
+    for (const t of this.trail) t.life -= dt;
+    while (this.trail.length && this.trail[0].life <= 0) this.trail.shift();
+  }
+  // base (near player) and tip (far end) of the blade in world space
+  base() { return { x: this.player.x + Math.cos(this.angle) * this.orbit,
+                    y: this.player.y + Math.sin(this.angle) * this.orbit }; }
+  tip()  { return { x: this.player.x + Math.cos(this.angle) * (this.orbit + this.length),
+                    y: this.player.y + Math.sin(this.angle) * (this.orbit + this.length) }; }
+}
+
+/* =========================================================================
+   Enemy — homing circle with HP + hit flash.
+   ========================================================================= */
+class Enemy {
+  constructor(x, y) {
+    const e = CONFIG.enemy;
+    this.x = x; this.y = y;
+    this.radius = e.radius;
+    this.speed = e.speed * rand(0.85, 1.25);
+    this.hp = e.hp;
+    this.maxHP = e.hp;
+    this.dead = false;
+    this.hitFlash = 0;
+    this.hitCooldown = 0; // throttles the sword's damage ticks
+  }
+  update(dt, player) {
+    const dx = player.x - this.x, dy = player.y - this.y;
+    const d = Math.hypot(dx, dy) || 1;
+    this.x += (dx / d) * this.speed * dt;
+    this.y += (dy / d) * this.speed * dt;
+    if (this.hitFlash > 0) this.hitFlash -= dt;
+    if (this.hitCooldown > 0) this.hitCooldown -= dt;
+  }
+  hurt(amount) { this.hp -= amount; this.hitFlash = 0.1; if (this.hp <= 0) this.dead = true; }
+}
+
+/* =========================================================================
+   EnemySpawner — spawns off-screen on a timer.
+   ========================================================================= */
+class EnemySpawner {
+  constructor() { this.timer = 0; this.interval = CONFIG.enemy.spawnInterval; this.elapsed = 0; }
+  update(dt, player, camera, enemies) {
+    this.elapsed += dt;
+    this.timer += dt;
+    // gentle ramp: spawn a touch faster the longer you survive
+    const interval = Math.max(0.28, this.interval - this.elapsed * 0.004);
+    while (this.timer >= interval) {
+      this.timer -= interval;
+      enemies.push(this._spawn(camera));
+    }
+  }
+  _spawn(camera) {
+    // pick a point just outside the visible rectangle, in world space
+    const w = camera.canvas.width, h = camera.canvas.height, pad = 60;
+    const side = Math.floor(rand(0, 4));
+    let sx, sy;
+    if (side === 0) { sx = rand(0, w); sy = -pad; }
+    else if (side === 1) { sx = w + pad; sy = rand(0, h); }
+    else if (side === 2) { sx = rand(0, w); sy = h + pad; }
+    else { sx = -pad; sy = rand(0, h); }
+    const world = camera.screenToWorld(sx, sy);
+    return new Enemy(world.x, world.y);
+  }
+}
+
+/* =========================================================================
+   XPOrb — yellow pickup, magnet toward player, auto-collected.
+   ========================================================================= */
+class XPOrb {
+  constructor(x, y) { this.x = x; this.y = y; this.radius = CONFIG.xp.radius; this.value = CONFIG.xp.value; this.collected = false; this.bob = rand(0, TAU); }
+  update(dt, player) {
+    this.bob += dt * 4;
+    const dx = player.x - this.x, dy = player.y - this.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (d < CONFIG.xp.magnetRange) {
+      const pull = CONFIG.xp.magnetSpeed * (1 - d / CONFIG.xp.magnetRange) + 60;
+      this.x += (dx / d) * pull * dt;
+      this.y += (dy / d) * pull * dt;
+    }
+    if (d < player.radius + this.radius) this.collected = true;
+  }
+}
+
+/* =========================================================================
+   Collision — stateless geometry helpers.
+   ========================================================================= */
+const Collision = {
+  // distance from point P to segment AB, used for the blade (a thick segment)
+  segCircle(ax, ay, bx, by, cx, cy, r) {
+    const abx = bx - ax, aby = by - ay;
+    const t = clamp(((cx - ax) * abx + (cy - ay) * aby) / (abx * abx + aby * aby || 1), 0, 1);
+    const px = ax + abx * t, py = ay + aby * t;
+    return Math.hypot(cx - px, cy - py) <= r;
+  },
+  circles(ax, ay, ar, bx, by, br) { return Math.hypot(ax - bx, ay - by) <= ar + br; },
+};
+
+/* =========================================================================
+   ParticleSystem — pooled particles + floating text.
+   ========================================================================= */
+class ParticleSystem {
+  constructor() { this.particles = []; this.texts = []; this.pool = []; }
+  _get() { return this.pool.pop() || {}; }
+  burst(x, y, color, count = 10, power = 180) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, TAU), s = rand(power * 0.3, power);
+      const p = this._get();
+      p.x = x; p.y = y; p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s;
+      p.life = p.maxLife = rand(0.3, 0.6); p.color = color; p.size = rand(2, 4.5);
+      this.particles.push(p);
+    }
+  }
+  floatText(x, y, text, color = "#ffd23f") { this.texts.push({ x, y, text, color, life: 0.9, vy: -42 }); }
+  update(dt) {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt;
+      if (p.life <= 0) { this.particles.splice(i, 1); this.pool.push(p); }
+    }
+    for (let i = this.texts.length - 1; i >= 0; i--) {
+      const t = this.texts[i]; t.y += t.vy * dt; t.life -= dt;
+      if (t.life <= 0) this.texts.splice(i, 1);
+    }
+  }
+}
+
+/* =========================================================================
+   UpgradeSystem — data-driven upgrade defs + level-up gating.
+   ========================================================================= */
+class UpgradeSystem {
+  constructor(game) {
+    this.game = game;
+    this.all = [
+      { icon: "🌀", name: "+10% Sword Speed",  desc: "The blade orbits faster.",      apply: () => game.sword.rotSpeed *= 1.10 },
+      { icon: "📏", name: "+10% Sword Length",  desc: "Greater reach on every swing.", apply: () => game.sword.length  *= 1.10 },
+      { icon: "👟", name: "+10% Move Speed",    desc: "Dodge and reposition faster.",  apply: () => game.player.speed  *= 1.10 },
+      { icon: "💥", name: "+20% Damage",        desc: "Hit harder per slash.",         apply: () => game.sword.damage  *= 1.20 },
+      { icon: "❤️", name: "+25 Max HP",         desc: "Tougher to take down.",         apply: () => { game.player.maxHP += 25; game.player.hp += 25; } },
+      { icon: "🧲", name: "+25% XP Magnet",     desc: "Collect orbs from farther.",    apply: () => CONFIG.xp.magnetRange *= 1.25 },
+    ];
+  }
+  // pick three distinct random upgrades
+  roll() {
+    const pool = [...this.all];
+    const out = [];
+    for (let i = 0; i < 3 && pool.length; i++) out.push(pool.splice(Math.floor(rand(0, pool.length)), 1)[0]);
+    return out;
+  }
+}
+
+/* =========================================================================
+   Renderer — ALL canvas drawing. Decoupled so Godot port can delete it.
+   ========================================================================= */
+class Renderer {
+  constructor(ctx, camera) { this.ctx = ctx; this.camera = camera; }
+
+  clear() { const { ctx } = this; ctx.fillStyle = "#0a0e16"; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
+
+  grid() {
+    const { ctx, camera } = this, g = CONFIG.grid, w = ctx.canvas.width, h = ctx.canvas.height;
+    const startX = Math.floor((camera.x - w / 2) / g.size) * g.size;
+    const startY = Math.floor((camera.y - h / 2) / g.size) * g.size;
+    ctx.lineWidth = 1;
+    for (let x = startX; x < camera.x + w / 2 + g.size; x += g.size) {
+      const s = camera.worldToScreen(x, 0);
+      ctx.strokeStyle = (x === 0) ? g.axis : g.color;
+      ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, h); ctx.stroke();
+    }
+    for (let y = startY; y < camera.y + h / 2 + g.size; y += g.size) {
+      const s = camera.worldToScreen(0, y);
+      ctx.strokeStyle = (y === 0) ? g.axis : g.color;
+      ctx.beginPath(); ctx.moveTo(0, s.y); ctx.lineTo(w, s.y); ctx.stroke();
+    }
+  }
+
+  player(p) {
+    const { ctx, camera } = this, s = camera.worldToScreen(p.x, p.y);
+    ctx.save();
+    ctx.shadowColor = CONFIG.player.color; ctx.shadowBlur = 18;
+    ctx.fillStyle = p.hitFlash > 0 ? "#ffffff" : CONFIG.player.color;
+    ctx.beginPath(); ctx.arc(s.x, s.y, p.radius, 0, TAU); ctx.fill();
+    ctx.restore();
+    // inner highlight
+    ctx.fillStyle = "rgba(255,255,255,.35)";
+    ctx.beginPath(); ctx.arc(s.x - 4, s.y - 4, p.radius * 0.4, 0, TAU); ctx.fill();
+  }
+
+  sword(sw) {
+    const { ctx, camera } = this;
+    // trail
+    for (const t of sw.trail) {
+      const a = clamp(t.life / 0.18, 0, 1), s = camera.worldToScreen(t.x, t.y);
+      ctx.fillStyle = `rgba(160,210,255,${a * 0.5})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, sw.width * 0.5 * a, 0, TAU); ctx.fill();
+    }
+    // blade as a rotated rectangle
+    const base = camera.worldToScreen(sw.base().x, sw.base().y);
+    ctx.save();
+    ctx.translate(base.x, base.y);
+    ctx.rotate(sw.angle);
+    ctx.shadowColor = "#9fd0ff"; ctx.shadowBlur = 12;
+    ctx.fillStyle = CONFIG.sword.color;
+    ctx.fillRect(0, -sw.width / 2, sw.length, sw.width);
+    // pointed tip
+    ctx.beginPath();
+    ctx.moveTo(sw.length, -sw.width / 2);
+    ctx.lineTo(sw.length + 12, 0);
+    ctx.lineTo(sw.length, sw.width / 2);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  enemy(e) {
+    const { ctx, camera } = this, s = camera.worldToScreen(e.x, e.y);
+    ctx.fillStyle = e.hitFlash > 0 ? "#ffffff" : CONFIG.enemy.color;
+    ctx.beginPath(); ctx.arc(s.x, s.y, e.radius, 0, TAU); ctx.fill();
+    // tiny HP pip when damaged
+    if (e.hp < e.maxHP) {
+      const w = e.radius * 2, frac = clamp(e.hp / e.maxHP, 0, 1);
+      ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(s.x - e.radius, s.y - e.radius - 7, w, 3);
+      ctx.fillStyle = "#7CFF8A"; ctx.fillRect(s.x - e.radius, s.y - e.radius - 7, w * frac, 3);
+    }
+  }
+
+  orb(o) {
+    const { ctx, camera } = this, s = camera.worldToScreen(o.x, o.y);
+    const r = o.radius + Math.sin(o.bob) * 1.5;
+    ctx.save(); ctx.shadowColor = CONFIG.xp.color || "#ffd23f"; ctx.shadowBlur = 10;
+    ctx.fillStyle = "#ffd23f";
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  particles(ps) {
+    const { ctx, camera } = this;
+    for (const p of ps.particles) {
+      const s = camera.worldToScreen(p.x, p.y), a = clamp(p.life / p.maxLife, 0, 1);
+      ctx.globalAlpha = a; ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, p.size, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = "bold 14px Segoe UI, sans-serif"; ctx.textAlign = "center";
+    for (const t of ps.texts) {
+      const s = camera.worldToScreen(t.x, t.y);
+      ctx.globalAlpha = clamp(t.life / 0.9, 0, 1); ctx.fillStyle = t.color;
+      ctx.fillText(t.text, s.x, s.y);
+    }
+    ctx.globalAlpha = 1; ctx.textAlign = "start";
+  }
+}
+
+/* =========================================================================
+   UI — HUD + overlays. Talks to the DOM, reads game state.
+   ========================================================================= */
+class UI {
+  constructor(game) {
+    this.game = game;
+    this.el = {
+      hp: document.getElementById("hp-fill"),
+      xp: document.getElementById("xp-fill"),
+      level: document.getElementById("level"),
+      fps: document.getElementById("fps"),
+      kills: document.getElementById("kills"),
+      coins: document.getElementById("coins"),
+      cards: document.getElementById("cards"),
+      levelup: document.getElementById("overlay-levelup"),
+      pause: document.getElementById("overlay-pause"),
+      gameover: document.getElementById("overlay-gameover"),
+      goSummary: document.getElementById("go-summary"),
+    };
+    document.getElementById("resume-btn").onclick = () => game.togglePause();
+    document.getElementById("restart-btn").onclick = () => game.restart();
+  }
+  update(fps) {
+    const g = this.game, p = g.player;
+    this.el.hp.style.width = (p.hp / p.maxHP * 100) + "%";
+    this.el.xp.style.width = (g.xp / g.xpNeeded * 100) + "%";
+    this.el.level.textContent = g.level;
+    this.el.fps.textContent = Math.round(fps);
+    this.el.kills.textContent = g.kills;
+    this.el.coins.textContent = g.coins;
+  }
+  showLevelUp(choices) {
+    this.el.cards.innerHTML = "";
+    choices.forEach((c, i) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<div class="key">[${i + 1}]</div><div class="icon">${c.icon}</div>
+                        <div class="name">${c.name}</div><div class="desc">${c.desc}</div>`;
+      card.onclick = () => this.game.chooseUpgrade(i);
+      this.el.cards.appendChild(card);
+    });
+    this.el.levelup.classList.add("show");
+  }
+  hideLevelUp() { this.el.levelup.classList.remove("show"); }
+  showPause(v) { this.el.pause.classList.toggle("show", v); }
+  showGameOver(summary) { this.el.goSummary.textContent = summary; this.el.gameover.classList.add("show"); }
+  hideGameOver() { this.el.gameover.classList.remove("show"); }
+}
+
+/* =========================================================================
+   Game — orchestrator. Owns the loop, state, and all systems.
+   ========================================================================= */
+const STATE = { PLAYING: "PLAYING", LEVELUP: "LEVELUP", PAUSED: "PAUSED", GAMEOVER: "GAMEOVER" };
+
+class Game {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.input = new Input(canvas);
+    this.camera = new Camera(canvas);
+    this.renderer = new Renderer(this.ctx, this.camera);
+    this.particles = new ParticleSystem();
+    this.upgrades = new UpgradeSystem(this);
+    this.ui = new UI(this);
+
+    this._resize();
+    addEventListener("resize", () => this._resize());
+
+    // upgrade hotkeys + pause keys
+    this.input.onSelect = (i) => { if (this.state === STATE.LEVELUP) this.chooseUpgrade(i); };
+    addEventListener("keydown", (e) => {
+      if (e.code === "KeyP" || e.code === "Escape") { if (this.state === STATE.PLAYING || this.state === STATE.PAUSED) this.togglePause(); }
+      if (e.code === "Enter" && this.state === STATE.GAMEOVER) this.restart();
+    });
+
+    this.reset();
+    this.last = performance.now();
+    this._fpsAccum = 0; this._fpsFrames = 0; this.fps = 60;
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  reset() {
+    this.player = new Player();
+    this.sword = new Sword(this.player);
+    this.spawner = new EnemySpawner();
+    this.enemies = [];
+    this.orbs = [];
+    this.particles.particles.length = 0;
+    this.particles.texts.length = 0;
+    this.camera.x = 0; this.camera.y = 0;
+    this.xp = 0; this.level = 1; this.xpNeeded = CONFIG.xp.perLevelBase;
+    this.kills = 0; this.coins = 0;
+    this.state = STATE.PLAYING;
+  }
+
+  _resize() { this.canvas.width = innerWidth; this.canvas.height = innerHeight; }
+
+  /* ---- state transitions ---- */
+  togglePause() {
+    if (this.state === STATE.PLAYING) { this.state = STATE.PAUSED; this.ui.showPause(true); }
+    else if (this.state === STATE.PAUSED) { this.state = STATE.PLAYING; this.ui.showPause(false); this.last = performance.now(); }
+  }
+  restart() { this.ui.hideGameOver(); this.ui.showPause(false); this.reset(); this.last = performance.now(); }
+
+  levelUp() {
+    this.level++;
+    this.xp -= this.xpNeeded;
+    this.xpNeeded = CONFIG.xp.perLevelBase + (this.level - 1) * 5; // gentle curve
+    this.state = STATE.LEVELUP;
+    this._choices = this.upgrades.roll();
+    this.ui.showLevelUp(this._choices);
+  }
+  chooseUpgrade(i) {
+    if (this.state !== STATE.LEVELUP || !this._choices[i]) return;
+    this._choices[i].apply();
+    this.ui.hideLevelUp();
+    // queue another level-up if enough XP carried over
+    if (this.xp >= this.xpNeeded) { this.levelUp(); }
+    else { this.state = STATE.PLAYING; this.last = performance.now(); }
+  }
+
+  gainXP(n) {
+    this.xp += n;
+    this.coins += n; // coins track collected XP for now
+    if (this.xp >= this.xpNeeded && this.state === STATE.PLAYING) this.levelUp();
+  }
+
+  /* ---- update ---- */
+  update(dt) {
+    const dir = this.input.getMoveVector(this.player, this.camera);
+    this.player.update(dt, dir);
+    this.sword.update(dt);
+    this.camera.follow(this.player, dt);
+    this.spawner.update(dt, this.player, this.camera, this.enemies);
+
+    // enemies
+    const base = this.sword.base(), tip = this.sword.tip();
+    for (const e of this.enemies) {
+      e.update(dt, this.player);
+      // sword collision (thick segment vs circle), throttled per enemy
+      if (e.hitCooldown <= 0 && Collision.segCircle(base.x, base.y, tip.x, tip.y, e.x, e.y, e.radius + this.sword.width / 2)) {
+        e.hurt(this.sword.damage);
+        e.hitCooldown = 0.12;
+        this.particles.burst(e.x, e.y, "#ffd2d8", 5, 120);
+        if (e.dead) this._onEnemyDeath(e);
+      }
+      // contact damage to player
+      if (!e.dead && Collision.circles(e.x, e.y, e.radius, this.player.x, this.player.y, this.player.radius)) {
+        this.player.damage(CONFIG.enemy.contactDPS * dt);
+      }
+    }
+    this.enemies = this.enemies.filter((e) => !e.dead);
+
+    // orbs
+    for (const o of this.orbs) {
+      o.update(dt, this.player);
+      if (o.collected) { this.gainXP(o.value); this.particles.floatText(o.x, o.y, "+" + o.value + " XP"); }
+    }
+    this.orbs = this.orbs.filter((o) => !o.collected);
+
+    this.particles.update(dt);
+
+    if (this.player.hp <= 0) this._gameOver();
+  }
+
+  _onEnemyDeath(e) {
+    this.kills++;
+    this.camera.addShake(4);
+    this.particles.burst(e.x, e.y, CONFIG.enemy.color, 14, 220);
+    this.orbs.push(new XPOrb(e.x, e.y));
+  }
+
+  _gameOver() {
+    this.state = STATE.GAMEOVER;
+    this.ui.showGameOver(`Level ${this.level} · ${this.kills} kills · ${this.coins} coins`);
+  }
+
+  /* ---- render ---- */
+  render() {
+    const r = this.renderer;
+    r.clear();
+    r.grid();
+    for (const o of this.orbs) r.orb(o);
+    for (const e of this.enemies) r.enemy(e);
+    r.sword(this.sword);
+    r.player(this.player);
+    r.particles(this.particles);
+  }
+
+  /* ---- main loop ---- */
+  loop(now) {
+    let dt = (now - this.last) / 1000;
+    this.last = now;
+    dt = clamp(dt, 0, 0.05); // guard against tab stalls
+
+    // fps meter (smoothed, updated ~4x/sec)
+    this._fpsAccum += dt; this._fpsFrames++;
+    if (this._fpsAccum >= 0.25) { this.fps = this._fpsFrames / this._fpsAccum; this._fpsAccum = 0; this._fpsFrames = 0; }
+
+    if (this.state === STATE.PLAYING) this.update(dt);
+    this.render();
+    this.ui.update(this.fps);
+
+    requestAnimationFrame((t) => this.loop(t));
+  }
+}
+
+/* ---- boot ---- */
+window.addEventListener("load", () => { window.game = new Game(document.getElementById("game")); });
+</script>
+</body>
+</html>

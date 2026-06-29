@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>OrbitSlash — Prototype</title>
 <style>
-  :root { --accent: #4da3ff; --xp: #ffd23f; }
+  :root { --accent: #4da3ff; --xp: #ffd23f; --crit: #ff6f3c; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0e16; }
   body { font-family: "Segoe UI", system-ui, sans-serif; color: #e8eef7; touch-action: none; }
@@ -15,35 +15,60 @@
   .hud { position: fixed; pointer-events: none; z-index: 5; text-shadow: 0 1px 3px #000; }
   #hud-tl { top: 14px; left: 16px; }
   #hud-tr { top: 14px; right: 16px; text-align: right; }
+  #hud-top { top: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
   #hud-bottom { bottom: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
   .hud .row { font-size: 15px; line-height: 1.55; font-weight: 600; }
   .bar { width: 190px; height: 12px; border-radius: 6px; background: #1c2535; overflow: hidden; margin-top: 2px; box-shadow: inset 0 0 0 1px #2c3950; }
-  .bar > span { display: block; height: 100%; transition: width .12s linear; }
+  .bar > span { display: block; height: 100%; transition: width .18s cubic-bezier(.2,.8,.2,1); }
   #hp-fill { background: linear-gradient(90deg, #ff5a5a, #ff8c5a); }
   #xp-fill { background: linear-gradient(90deg, #ffd23f, #ffe98a); }
   .label { font-size: 11px; opacity: .7; letter-spacing: .06em; text-transform: uppercase; }
+  #coins, #kills { display: inline-block; }
   #coins { font-size: 18px; font-weight: 700; color: var(--xp); }
+  #wave-num { font-size: 22px; font-weight: 800; letter-spacing: .04em; }
+  /* number "pop" tween when a stat increments */
+  .pop { animation: pop .28s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.35)} 100%{transform:scale(1)} }
+
+  /* ---------- Wave banner ---------- */
+  #banner { position: fixed; top: 32%; left: 50%; transform: translate(-50%,-50%); z-index: 8;
+            text-align: center; pointer-events: none; opacity: 0; }
+  #banner.show { animation: banner 2.0s ease forwards; }
+  #banner .big { font-size: 46px; font-weight: 800; text-shadow: 0 2px 18px rgba(77,163,255,.5); }
+  #banner .sub { font-size: 18px; opacity: .85; margin-top: 4px; }
+  @keyframes banner {
+    0% { opacity: 0; transform: translate(-50%,-50%) scale(.8); }
+    15% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%,-50%) scale(1.05); }
+  }
 
   /* ---------- Overlays ---------- */
   .overlay { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
              flex-direction: column; background: rgba(8,12,20,.78); backdrop-filter: blur(3px); }
-  .overlay.show { display: flex; }
+  .overlay.show { display: flex; animation: fade .2s ease; }
+  @keyframes fade { from{opacity:0} to{opacity:1} }
   .overlay h1 { font-size: 40px; margin-bottom: 6px; letter-spacing: .02em; }
   .overlay h2 { font-size: 24px; margin-bottom: 22px; color: var(--accent); }
   .overlay p { opacity: .8; margin-bottom: 18px; }
 
   .cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; max-width: 760px; }
   .card { width: 210px; min-height: 150px; background: #131c2c; border: 2px solid #243349; border-radius: 14px;
-          padding: 18px; cursor: pointer; transition: transform .1s, border-color .1s, box-shadow .1s; text-align: left; }
-  .card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 8px 26px rgba(77,163,255,.25); }
+          padding: 18px; cursor: pointer; transition: transform .12s, border-color .12s, box-shadow .12s; text-align: left;
+          animation: cardIn .28s cubic-bezier(.2,1.1,.3,1) backwards; }
+  .card:nth-child(1){animation-delay:.02s} .card:nth-child(2){animation-delay:.08s} .card:nth-child(3){animation-delay:.14s}
+  @keyframes cardIn { from{opacity:0; transform:translateY(18px) scale(.96)} to{opacity:1; transform:none} }
+  .card:hover { transform: translateY(-5px); border-color: var(--accent); box-shadow: 0 8px 26px rgba(77,163,255,.25); }
+  .card.selected { animation: cardPick .18s ease forwards; border-color: var(--xp); box-shadow: 0 0 30px rgba(255,210,63,.5); }
+  @keyframes cardPick { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1.05)} }
   .card .key { font-size: 12px; opacity: .55; }
   .card .icon { font-size: 30px; margin: 4px 0 10px; }
   .card .name { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
   .card .desc { font-size: 13px; opacity: .8; line-height: 1.4; }
 
   .btn { pointer-events: auto; margin-top: 8px; padding: 12px 30px; font-size: 16px; font-weight: 700; color: #06101e;
-         background: var(--accent); border: none; border-radius: 10px; cursor: pointer; transition: filter .1s; }
-  .btn:hover { filter: brightness(1.1); }
+         background: var(--accent); border: none; border-radius: 10px; cursor: pointer; transition: filter .1s, transform .1s; }
+  .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
 
   #hint { position: fixed; bottom: 14px; left: 16px; z-index: 5; font-size: 12px; opacity: .45; pointer-events: none; }
 </style>
@@ -58,6 +83,10 @@
   <div class="label" style="margin-top:8px">Level <span id="level">1</span> — XP</div>
   <div class="bar"><span id="xp-fill"></span></div>
 </div>
+<div id="hud-top" class="hud">
+  <div class="label">Wave</div>
+  <div id="wave-num">1</div>
+</div>
 <div id="hud-tr" class="hud">
   <div class="row">FPS <span id="fps">60</span></div>
   <div class="row">Kills <span id="kills">0</span></div>
@@ -67,6 +96,9 @@
   <div id="coins">0</div>
 </div>
 <div id="hint">WASD / Arrows / Hold Mouse / Joystick · P to pause</div>
+
+<!-- Wave banner -->
+<div id="banner"><div class="big"></div><div class="sub"></div></div>
 
 <!-- Level Up -->
 <div id="overlay-levelup" class="overlay">
@@ -93,15 +125,31 @@
 "use strict";
 
 /* =========================================================================
-   CONFIG — single source of truth for tuning (becomes Godot Resources later)
+   CONFIG — single source of truth for tuning (becomes Godot Resources later).
+   No magic numbers in the systems below; tune everything from here.
    ========================================================================= */
 const CONFIG = {
-  player: { radius: 16, speed: 260, maxHP: 100, color: "#4da3ff", accel: 0.18 },
-  sword:  { length: 70, width: 12, rotSpeed: 3.2, damage: 25, orbit: 30, color: "#cfe6ff" },
-  enemy:  { radius: 14, speed: 70, hp: 50, spawnInterval: 1.0, color: "#ff5a6e", contactDPS: 22 },
-  xp:     { radius: 6, value: 1, magnetRange: 110, magnetSpeed: 520, perLevelBase: 10 },
+  player: { radius: 16, speed: 260, maxHP: 100, color: "#4da3ff", accel: 0.18,
+            squash: 0.18 /* velocity-driven squash & stretch amount */ },
+  sword:  { length: 70, width: 12, rotSpeed: 3.2, damage: 25, orbit: 30, color: "#cfe6ff",
+            rotEase: 8 /* how fast rotSpeed changes interpolate (swing feel) */,
+            trailLife: 0.18 },
+  combat: { critChance: 0.08, critMult: 2.0, hitStop: 0.045 /* s freeze on hit */,
+            knockback: 240, knockbackFriction: 0.86, hitCooldown: 0.12 },
+  // Enemy archetypes: color / size / speed / hp all differ per type.
+  enemyTypes: {
+    normal: { hp: 50,  speed: 72,  radius: 14, color: "#ff5a6e", contactDPS: 22, kbResist: 1.0,  introWave: 1 },
+    fast:   { hp: 24,  speed: 150, radius: 10, color: "#ffb454", contactDPS: 15, kbResist: 1.5,  introWave: 2 },
+    tank:   { hp: 170, speed: 38,  radius: 23, color: "#b06bff", contactDPS: 34, kbResist: 0.4,  introWave: 3 },
+    ranged: { hp: 42,  speed: 88,  radius: 13, color: "#5ad1c4", contactDPS: 18, kbResist: 1.0,  introWave: 3, ranged: true },
+  },
+  wave:   { firstDelay: 1.4, restTime: 2.6, baseCount: 8, countGrowth: 4,
+            baseInterval: 1.05, intervalDecay: 0.9, minInterval: 0.3 },
+  xp:     { radius: 6, value: 1, magnetRange: 110, magnetSpeed: 560, perLevelBase: 10, perLevelGrowth: 5,
+            mergeDist: 14, popTime: 0.25 },
   grid:   { size: 64, color: "#16202f", axis: "#1d2a3d" },
-  camera: { smooth: 6 },
+  camera: { smooth: 6, shakeMax: 22, shakeDecay: 60 },
+  fx:     { dmgRise: 46, dmgLife: 0.8, deathAnim: 0.18 },
 };
 
 /* =========================================================================
@@ -109,19 +157,31 @@ const CONFIG = {
    ========================================================================= */
 const rand  = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp  = (a, b, t) => a + (b - a) * t;
 const TAU   = Math.PI * 2;
+// frame-rate independent smoothing factor for exp lerp
+const smoothT = (rate, dt) => 1 - Math.exp(-rate * dt);
+
+/* =========================================================================
+   Pool — generic object pool. One job: recycle objects to avoid GC churn.
+   ========================================================================= */
+class Pool {
+  constructor(factory) { this.factory = factory; this.free = []; }
+  acquire() { return this.free.length ? this.free.pop() : this.factory(); }
+  release(obj) { this.free.push(obj); }
+}
 
 /* =========================================================================
    Input — keyboard, mouse, virtual joystick. One responsibility: read intent.
+   (Unchanged from Sprint 1 except documented hotkeys.)
    ========================================================================= */
 class Input {
   constructor(canvas) {
     this.canvas = canvas;
     this.keys = new Set();
     this.mouse = { x: 0, y: 0, down: false };
-    // Virtual joystick state
     this.joy = { active: false, baseX: 0, baseY: 0, dx: 0, dy: 0, id: null };
-    this.onSelect = null; // callback for upgrade hotkeys 1/2/3
+    this.onSelect = null; // upgrade hotkeys 1/2/3
 
     addEventListener("keydown", (e) => {
       this.keys.add(e.code);
@@ -135,16 +195,13 @@ class Input {
     addEventListener("mouseup", () => this.mouse.down = false);
     canvas.addEventListener("mousemove", (e) => this._setMouse(e));
 
-    // Touch -> virtual joystick (drag from anywhere)
     canvas.addEventListener("touchstart", (e) => this._touchStart(e), { passive: false });
     canvas.addEventListener("touchmove",  (e) => this._touchMove(e),  { passive: false });
     canvas.addEventListener("touchend",   (e) => this._touchEnd(e));
   }
-
   _setMouse(e) {
     const r = this.canvas.getBoundingClientRect();
-    this.mouse.x = e.clientX - r.left;
-    this.mouse.y = e.clientY - r.top;
+    this.mouse.x = e.clientX - r.left; this.mouse.y = e.clientY - r.top;
   }
   _touchStart(e) {
     e.preventDefault();
@@ -157,31 +214,24 @@ class Input {
       if (t.identifier !== this.joy.id) continue;
       const max = 60;
       let dx = t.clientX - this.joy.baseX, dy = t.clientY - this.joy.baseY;
-      const len = Math.hypot(dx, dy) || 1;
-      const c = Math.min(len, max) / len;
-      this.joy.dx = (dx * c) / max; // normalized -1..1
-      this.joy.dy = (dy * c) / max;
+      const len = Math.hypot(dx, dy) || 1, c = Math.min(len, max) / len;
+      this.joy.dx = (dx * c) / max; this.joy.dy = (dy * c) / max;
     }
   }
   _touchEnd(e) {
     for (const t of e.changedTouches)
       if (t.identifier === this.joy.id) this.joy = { active: false, baseX: 0, baseY: 0, dx: 0, dy: 0, id: null };
   }
-
-  // Returns desired move direction in world space, normalized.
   getMoveVector(player, camera) {
     let x = 0, y = 0;
     if (this.keys.has("KeyW") || this.keys.has("ArrowUp"))    y -= 1;
     if (this.keys.has("KeyS") || this.keys.has("ArrowDown"))  y += 1;
     if (this.keys.has("KeyA") || this.keys.has("ArrowLeft"))  x -= 1;
     if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) x += 1;
-
     if (this.joy.active && (this.joy.dx || this.joy.dy)) { x = this.joy.dx; y = this.joy.dy; }
-
     if (x === 0 && y === 0 && this.mouse.down) {
       const w = camera.screenToWorld(this.mouse.x, this.mouse.y);
-      const dx = w.x - player.x, dy = w.y - player.y;
-      const d = Math.hypot(dx, dy);
+      const dx = w.x - player.x, dy = w.y - player.y, d = Math.hypot(dx, dy);
       if (d > player.radius) { x = dx / d; y = dy / d; }
     }
     const len = Math.hypot(x, y);
@@ -195,16 +245,16 @@ class Input {
 class Camera {
   constructor(canvas) { this.canvas = canvas; this.x = 0; this.y = 0; this.shake = 0; this.ox = 0; this.oy = 0; }
   follow(target, dt) {
-    const t = 1 - Math.exp(-CONFIG.camera.smooth * dt); // frame-rate independent lerp
+    const t = smoothT(CONFIG.camera.smooth, dt);
     this.x += (target.x - this.x) * t;
     this.y += (target.y - this.y) * t;
     if (this.shake > 0) {
       const m = this.shake;
       this.ox = rand(-m, m); this.oy = rand(-m, m);
-      this.shake = Math.max(0, this.shake - 60 * dt);
+      this.shake = Math.max(0, this.shake - CONFIG.camera.shakeDecay * dt);
     } else { this.ox = this.oy = 0; }
   }
-  addShake(amount) { this.shake = Math.min(18, this.shake + amount); }
+  addShake(amount) { this.shake = Math.min(CONFIG.camera.shakeMax, this.shake + amount); }
   worldToScreen(x, y) {
     return { x: x - this.x + this.canvas.width / 2 + this.ox, y: y - this.y + this.canvas.height / 2 + this.oy };
   }
@@ -214,55 +264,53 @@ class Camera {
 }
 
 /* =========================================================================
-   Player — blue circle. Movement + health.
+   Player — blue circle. Movement, health, squash & stretch.
    ========================================================================= */
 class Player {
   constructor() {
     const c = CONFIG.player;
-    this.x = 0; this.y = 0;
-    this.vx = 0; this.vy = 0;
-    this.radius = c.radius;
-    this.speed = c.speed;
-    this.maxHP = c.maxHP;
-    this.hp = c.maxHP;
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
+    this.radius = c.radius; this.speed = c.speed;
+    this.maxHP = c.maxHP; this.hp = c.maxHP;
     this.hitFlash = 0;
+    this.critChance = CONFIG.combat.critChance;
+    this.coinBonus = 0; // extra coins per orb from "+Coin Magnet"
   }
   update(dt, dir) {
-    const targetVX = dir.x * this.speed, targetVY = dir.y * this.speed;
-    // smoothed acceleration for nicer feel
+    const tvx = dir.x * this.speed, tvy = dir.y * this.speed;
     const a = 1 - Math.pow(1 - CONFIG.player.accel, dt * 60);
-    this.vx += (targetVX - this.vx) * a;
-    this.vy += (targetVY - this.vy) * a;
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
+    this.vx += (tvx - this.vx) * a; this.vy += (tvy - this.vy) * a;
+    this.x += this.vx * dt; this.y += this.vy * dt;
     if (this.hitFlash > 0) this.hitFlash -= dt;
   }
+  // squash factor along the velocity axis (1 = none); used by Renderer.
+  get speedRatio() { return clamp(Math.hypot(this.vx, this.vy) / this.speed, 0, 1); }
   damage(amount) { this.hp = Math.max(0, this.hp - amount); this.hitFlash = 0.15; }
 }
 
 /* =========================================================================
-   Sword — rotating rectangle around player. Configurable, with trail.
+   Sword — rotating rectangle around player. Eased rotation + trail.
    ========================================================================= */
 class Sword {
   constructor(player) {
     const s = CONFIG.sword;
     this.player = player;
     this.angle = 0;
-    this.length = s.length;
-    this.width = s.width;
-    this.rotSpeed = s.rotSpeed;
-    this.damage = s.damage;
-    this.orbit = s.orbit;
-    this.trail = []; // tip positions for the trail effect
+    this.length = s.length; this.width = s.width;
+    this.rotSpeed = s.rotSpeed;       // target rotation speed
+    this.curRotSpeed = s.rotSpeed;    // eased actual (smooth swing accel)
+    this.damage = s.damage; this.orbit = s.orbit;
+    this.trail = [];
   }
   update(dt) {
-    this.angle = (this.angle + this.rotSpeed * dt) % TAU;
+    // interpolate rotation speed so upgrades ramp in smoothly (swing feel)
+    this.curRotSpeed = lerp(this.curRotSpeed, this.rotSpeed, smoothT(CONFIG.sword.rotEase, dt));
+    this.angle = (this.angle + this.curRotSpeed * dt) % TAU;
     const tip = this.tip();
-    this.trail.push({ x: tip.x, y: tip.y, life: 0.18 });
+    this.trail.push({ x: tip.x, y: tip.y, life: CONFIG.sword.trailLife });
     for (const t of this.trail) t.life -= dt;
     while (this.trail.length && this.trail[0].life <= 0) this.trail.shift();
   }
-  // base (near player) and tip (far end) of the blade in world space
   base() { return { x: this.player.x + Math.cos(this.angle) * this.orbit,
                     y: this.player.y + Math.sin(this.angle) * this.orbit }; }
   tip()  { return { x: this.player.x + Math.cos(this.angle) * (this.orbit + this.length),
@@ -270,73 +318,116 @@ class Sword {
 }
 
 /* =========================================================================
-   Enemy — homing circle with HP + hit flash.
+   Enemy — poolable homing entity. Type-driven stats, knockback, death anim.
    ========================================================================= */
 class Enemy {
-  constructor(x, y) {
-    const e = CONFIG.enemy;
-    this.x = x; this.y = y;
-    this.radius = e.radius;
-    this.speed = e.speed * rand(0.85, 1.25);
-    this.hp = e.hp;
-    this.maxHP = e.hp;
-    this.dead = false;
-    this.hitFlash = 0;
-    this.hitCooldown = 0; // throttles the sword's damage ticks
+  // init() lets the pool recycle a single instance.
+  init(typeKey, x, y) {
+    const t = CONFIG.enemyTypes[typeKey];
+    this.type = typeKey;
+    this.x = x; this.y = y; this.vx = 0; this.vy = 0; // vx/vy = knockback velocity
+    this.radius = t.radius; this.baseRadius = t.radius;
+    this.speed = t.speed * rand(0.9, 1.15);
+    this.hp = t.hp; this.maxHP = t.hp;
+    this.color = t.color; this.contactDPS = t.contactDPS; this.kbResist = t.kbResist;
+    this.dead = false; this.dying = false; this.deathT = 0;
+    this.hitFlash = 0; this.hitCooldown = 0; this.squash = 0;
+    return this;
   }
   update(dt, player) {
-    const dx = player.x - this.x, dy = player.y - this.y;
-    const d = Math.hypot(dx, dy) || 1;
-    this.x += (dx / d) * this.speed * dt;
-    this.y += (dy / d) * this.speed * dt;
+    if (this.dying) { this.deathT -= dt; if (this.deathT <= 0) this.dead = true; return; }
+    // homing
+    const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy) || 1;
+    this.x += (dx / d) * this.speed * dt + this.vx * dt;
+    this.y += (dy / d) * this.speed * dt + this.vy * dt;
+    // knockback decay
+    this.vx *= CONFIG.combat.knockbackFriction; this.vy *= CONFIG.combat.knockbackFriction;
     if (this.hitFlash > 0) this.hitFlash -= dt;
     if (this.hitCooldown > 0) this.hitCooldown -= dt;
+    if (this.squash > 0) this.squash -= dt * 4;
   }
-  hurt(amount) { this.hp -= amount; this.hitFlash = 0.1; if (this.hp <= 0) this.dead = true; }
+  hurt(amount) { this.hp -= amount; this.hitFlash = 0.1; this.squash = 0.18; if (this.hp <= 0) this._beginDeath(); }
+  applyKnockback(dirx, diry, force) { const f = force / this.kbResist; this.vx += dirx * f; this.vy += diry * f; }
+  _beginDeath() { this.dying = true; this.deathT = CONFIG.fx.deathAnim; }
+  // true only on the frame death begins (handled in Game via dying flag)
 }
 
 /* =========================================================================
-   EnemySpawner — spawns off-screen on a timer.
+   WaveSystem — replaces endless spawn. Waves scale count + interval; emits
+   "Wave N" / "Wave Complete" banners. One job: pace enemy pressure.
    ========================================================================= */
-class EnemySpawner {
-  constructor() { this.timer = 0; this.interval = CONFIG.enemy.spawnInterval; this.elapsed = 0; }
-  update(dt, player, camera, enemies) {
-    this.elapsed += dt;
-    this.timer += dt;
-    // gentle ramp: spawn a touch faster the longer you survive
-    const interval = Math.max(0.28, this.interval - this.elapsed * 0.004);
-    while (this.timer >= interval) {
-      this.timer -= interval;
-      enemies.push(this._spawn(camera));
+class WaveSystem {
+  constructor(game) { this.game = game; this.reset(); }
+  reset() {
+    this.wave = 0;
+    this.phase = "REST";          // REST -> SPAWNING -> CLEARING -> REST
+    this.restTimer = CONFIG.wave.firstDelay;
+    this.toSpawn = 0; this.spawnTimer = 0; this.interval = CONFIG.wave.baseInterval;
+  }
+  _startWave() {
+    const w = CONFIG.wave;
+    this.wave++;
+    this.toSpawn = w.baseCount + (this.wave - 1) * w.countGrowth;
+    this.interval = Math.max(w.minInterval, w.baseInterval * Math.pow(w.intervalDecay, this.wave - 1));
+    this.spawnTimer = 0;
+    this.phase = "SPAWNING";
+    this.game.ui.banner("Wave " + this.wave, this.toSpawn + " enemies incoming");
+  }
+  update(dt) {
+    const g = this.game;
+    if (this.phase === "REST") {
+      this.restTimer -= dt;
+      if (this.restTimer <= 0) this._startWave();
+    } else if (this.phase === "SPAWNING") {
+      this.spawnTimer -= dt;
+      if (this.spawnTimer <= 0 && this.toSpawn > 0) {
+        g.spawnEnemy(this._pickType());
+        this.toSpawn--; this.spawnTimer = this.interval;
+      }
+      if (this.toSpawn <= 0) this.phase = "CLEARING";
+    } else if (this.phase === "CLEARING") {
+      if (g.enemies.length === 0) {
+        this.game.ui.banner("Wave " + this.wave + " Complete", "Get ready…");
+        this.phase = "REST"; this.restTimer = CONFIG.wave.restTime;
+      }
     }
   }
-  _spawn(camera) {
-    // pick a point just outside the visible rectangle, in world space
-    const w = camera.canvas.width, h = camera.canvas.height, pad = 60;
-    const side = Math.floor(rand(0, 4));
-    let sx, sy;
-    if (side === 0) { sx = rand(0, w); sy = -pad; }
-    else if (side === 1) { sx = w + pad; sy = rand(0, h); }
-    else if (side === 2) { sx = rand(0, w); sy = h + pad; }
-    else { sx = -pad; sy = rand(0, h); }
-    const world = camera.screenToWorld(sx, sy);
-    return new Enemy(world.x, world.y);
+  // weighted random type, gated by the wave each type is introduced in
+  _pickType() {
+    const pool = [];
+    for (const key in CONFIG.enemyTypes) {
+      if (this.wave >= CONFIG.enemyTypes[key].introWave) pool.push(key);
+    }
+    // bias toward tougher types in later waves
+    if (this.wave >= 4 && Math.random() < 0.25) return "tank";
+    return pool[Math.floor(rand(0, pool.length))];
   }
 }
 
 /* =========================================================================
-   XPOrb — yellow pickup, magnet toward player, auto-collected.
+   XPOrb — poolable. Pops in, bobs, glows, magnets smoothly, merges nearby.
    ========================================================================= */
 class XPOrb {
-  constructor(x, y) { this.x = x; this.y = y; this.radius = CONFIG.xp.radius; this.value = CONFIG.xp.value; this.collected = false; this.bob = rand(0, TAU); }
+  init(x, y, value) {
+    this.x = x; this.y = y; this.value = value;
+    this.radius = CONFIG.xp.radius; this.collected = false;
+    this.bob = rand(0, TAU); this.life = 0; this.scale = 0; // scale pops 0->1
+    // small "burst out" velocity so orbs scatter on spawn
+    const a = rand(0, TAU), s = rand(40, 110);
+    this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
+    return this;
+  }
   update(dt, player) {
-    this.bob += dt * 4;
-    const dx = player.x - this.x, dy = player.y - this.y;
-    const d = Math.hypot(dx, dy) || 1;
+    this.life += dt; this.bob += dt * 5;
+    this.scale = clamp(this.life / CONFIG.xp.popTime, 0, 1);
+    // initial scatter slows down
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.vx *= 0.9; this.vy *= 0.9;
+    // magnet toward player (eased, accelerates as it nears)
+    const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy) || 1;
     if (d < CONFIG.xp.magnetRange) {
-      const pull = CONFIG.xp.magnetSpeed * (1 - d / CONFIG.xp.magnetRange) + 60;
-      this.x += (dx / d) * pull * dt;
-      this.y += (dy / d) * pull * dt;
+      const pull = CONFIG.xp.magnetSpeed * (1 - d / CONFIG.xp.magnetRange) + 70;
+      this.x += (dx / d) * pull * dt; this.y += (dy / d) * pull * dt;
     }
     if (d < player.radius + this.radius) this.collected = true;
   }
@@ -346,7 +437,6 @@ class XPOrb {
    Collision — stateless geometry helpers.
    ========================================================================= */
 const Collision = {
-  // distance from point P to segment AB, used for the blade (a thick segment)
   segCircle(ax, ay, bx, by, cx, cy, r) {
     const abx = bx - ax, aby = by - ay;
     const t = clamp(((cx - ax) * abx + (cy - ay) * aby) / (abx * abx + aby * aby || 1), 0, 1);
@@ -357,64 +447,75 @@ const Collision = {
 };
 
 /* =========================================================================
-   ParticleSystem — pooled particles + floating text.
+   ParticleSystem — pooled particles + floating damage/XP text (also pooled).
    ========================================================================= */
 class ParticleSystem {
-  constructor() { this.particles = []; this.texts = []; this.pool = []; }
-  _get() { return this.pool.pop() || {}; }
+  constructor() {
+    this.particles = []; this.texts = [];
+    this._pPool = new Pool(() => ({}));
+    this._tPool = new Pool(() => ({}));
+  }
   burst(x, y, color, count = 10, power = 180) {
     for (let i = 0; i < count; i++) {
-      const a = rand(0, TAU), s = rand(power * 0.3, power);
-      const p = this._get();
+      const a = rand(0, TAU), s = rand(power * 0.3, power), p = this._pPool.acquire();
       p.x = x; p.y = y; p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s;
       p.life = p.maxLife = rand(0.3, 0.6); p.color = color; p.size = rand(2, 4.5);
       this.particles.push(p);
     }
   }
-  floatText(x, y, text, color = "#ffd23f") { this.texts.push({ x, y, text, color, life: 0.9, vy: -42 }); }
+  // floating text: damage numbers (crit = bigger/colored) and XP gains
+  floatText(x, y, text, color = "#ffd23f", scale = 1) {
+    const t = this._tPool.acquire();
+    t.x = x + rand(-6, 6); t.y = y; t.text = text; t.color = color;
+    t.life = CONFIG.fx.dmgLife; t.maxLife = CONFIG.fx.dmgLife; t.vy = -CONFIG.fx.dmgRise; t.scale = scale;
+    this.texts.push(t);
+  }
   update(dt) {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt;
-      if (p.life <= 0) { this.particles.splice(i, 1); this.pool.push(p); }
+      if (p.life <= 0) { this.particles.splice(i, 1); this._pPool.release(p); }
     }
     for (let i = this.texts.length - 1; i >= 0; i--) {
-      const t = this.texts[i]; t.y += t.vy * dt; t.life -= dt;
-      if (t.life <= 0) this.texts.splice(i, 1);
+      const t = this.texts[i]; t.y += t.vy * dt; t.vy *= 0.94; t.life -= dt;
+      if (t.life <= 0) { this.texts.splice(i, 1); this._tPool.release(t); }
     }
   }
+  clear() { this.particles.length = 0; this.texts.length = 0; }
 }
 
 /* =========================================================================
-   UpgradeSystem — data-driven upgrade defs + level-up gating.
+   UpgradeSystem — data-driven defs; rolls 3 DISTINCT random upgrades.
    ========================================================================= */
 class UpgradeSystem {
   constructor(game) {
     this.game = game;
+    const g = game;
     this.all = [
-      { icon: "🌀", name: "+10% Sword Speed",  desc: "The blade orbits faster.",      apply: () => game.sword.rotSpeed *= 1.10 },
-      { icon: "📏", name: "+10% Sword Length",  desc: "Greater reach on every swing.", apply: () => game.sword.length  *= 1.10 },
-      { icon: "👟", name: "+10% Move Speed",    desc: "Dodge and reposition faster.",  apply: () => game.player.speed  *= 1.10 },
-      { icon: "💥", name: "+20% Damage",        desc: "Hit harder per slash.",         apply: () => game.sword.damage  *= 1.20 },
-      { icon: "❤️", name: "+25 Max HP",         desc: "Tougher to take down.",         apply: () => { game.player.maxHP += 25; game.player.hp += 25; } },
-      { icon: "🧲", name: "+25% XP Magnet",     desc: "Collect orbs from farther.",    apply: () => CONFIG.xp.magnetRange *= 1.25 },
+      { icon: "💥", name: "+20% Damage",        desc: "Hit harder per slash.",         apply: () => g.sword.damage *= 1.20 },
+      { icon: "🌀", name: "+10% Attack Speed",  desc: "The blade orbits faster.",      apply: () => g.sword.rotSpeed *= 1.10 },
+      { icon: "📏", name: "+10% Sword Radius",  desc: "Greater reach on every swing.", apply: () => g.sword.length *= 1.10 },
+      { icon: "❤️", name: "+15 Max HP",         desc: "Tougher to take down.",         apply: () => { g.player.maxHP += 15; g.player.hp += 15; } },
+      { icon: "🎯", name: "+5% Critical",       desc: "More double-damage crits.",     apply: () => g.player.critChance += 0.05 },
+      { icon: "👟", name: "+15% Move Speed",    desc: "Dodge and reposition faster.",  apply: () => g.player.speed *= 1.15 },
+      { icon: "🛡️", name: "+10% Knockback",     desc: "Shove enemies back harder.",    apply: () => CONFIG.combat.knockback *= 1.10 },
+      { icon: "🧲", name: "+XP Magnet",         desc: "Collect orbs from farther.",    apply: () => CONFIG.xp.magnetRange *= 1.25 },
+      { icon: "🪙", name: "+Coin Magnet",       desc: "Earn an extra coin per orb.",   apply: () => g.player.coinBonus += 1 },
     ];
   }
-  // pick three distinct random upgrades
+  // pick three distinct upgrades — no duplicates within one selection
   roll() {
-    const pool = [...this.all];
-    const out = [];
+    const pool = [...this.all], out = [];
     for (let i = 0; i < 3 && pool.length; i++) out.push(pool.splice(Math.floor(rand(0, pool.length)), 1)[0]);
     return out;
   }
 }
 
 /* =========================================================================
-   Renderer — ALL canvas drawing. Decoupled so Godot port can delete it.
+   Renderer — ALL canvas drawing. Decoupled so a Godot port can delete it.
    ========================================================================= */
 class Renderer {
   constructor(ctx, camera) { this.ctx = ctx; this.camera = camera; }
-
   clear() { const { ctx } = this; ctx.fillStyle = "#0a0e16"; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
 
   grid() {
@@ -436,47 +537,51 @@ class Renderer {
 
   player(p) {
     const { ctx, camera } = this, s = camera.worldToScreen(p.x, p.y);
+    // squash & stretch along velocity direction
+    const r = p.speedRatio, ang = Math.atan2(p.vy, p.vx);
+    const sx = 1 + r * CONFIG.player.squash, sy = 1 - r * CONFIG.player.squash;
     ctx.save();
+    ctx.translate(s.x, s.y); ctx.rotate(ang); ctx.scale(sx, sy);
     ctx.shadowColor = CONFIG.player.color; ctx.shadowBlur = 18;
     ctx.fillStyle = p.hitFlash > 0 ? "#ffffff" : CONFIG.player.color;
-    ctx.beginPath(); ctx.arc(s.x, s.y, p.radius, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, p.radius, 0, TAU); ctx.fill();
     ctx.restore();
-    // inner highlight
     ctx.fillStyle = "rgba(255,255,255,.35)";
     ctx.beginPath(); ctx.arc(s.x - 4, s.y - 4, p.radius * 0.4, 0, TAU); ctx.fill();
   }
 
   sword(sw) {
     const { ctx, camera } = this;
-    // trail
     for (const t of sw.trail) {
-      const a = clamp(t.life / 0.18, 0, 1), s = camera.worldToScreen(t.x, t.y);
+      const a = clamp(t.life / CONFIG.sword.trailLife, 0, 1), s = camera.worldToScreen(t.x, t.y);
       ctx.fillStyle = `rgba(160,210,255,${a * 0.5})`;
       ctx.beginPath(); ctx.arc(s.x, s.y, sw.width * 0.5 * a, 0, TAU); ctx.fill();
     }
-    // blade as a rotated rectangle
     const base = camera.worldToScreen(sw.base().x, sw.base().y);
     ctx.save();
-    ctx.translate(base.x, base.y);
-    ctx.rotate(sw.angle);
+    ctx.translate(base.x, base.y); ctx.rotate(sw.angle);
     ctx.shadowColor = "#9fd0ff"; ctx.shadowBlur = 12;
     ctx.fillStyle = CONFIG.sword.color;
     ctx.fillRect(0, -sw.width / 2, sw.length, sw.width);
-    // pointed tip
     ctx.beginPath();
-    ctx.moveTo(sw.length, -sw.width / 2);
-    ctx.lineTo(sw.length + 12, 0);
-    ctx.lineTo(sw.length, sw.width / 2);
+    ctx.moveTo(sw.length, -sw.width / 2); ctx.lineTo(sw.length + 12, 0); ctx.lineTo(sw.length, sw.width / 2);
     ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
   enemy(e) {
     const { ctx, camera } = this, s = camera.worldToScreen(e.x, e.y);
-    ctx.fillStyle = e.hitFlash > 0 ? "#ffffff" : CONFIG.enemy.color;
-    ctx.beginPath(); ctx.arc(s.x, s.y, e.radius, 0, TAU); ctx.fill();
-    // tiny HP pip when damaged
-    if (e.hp < e.maxHP) {
+    let r = e.radius + (e.squash > 0 ? e.squash * 6 : 0);
+    let alpha = 1;
+    if (e.dying) { // death anim: expand + fade
+      const k = 1 - e.deathT / CONFIG.fx.deathAnim;
+      r = e.radius * (1 + k * 0.8); alpha = 1 - k;
+    }
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = e.hitFlash > 0 ? "#ffffff" : e.color;
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (!e.dying && e.hp < e.maxHP) {
       const w = e.radius * 2, frac = clamp(e.hp / e.maxHP, 0, 1);
       ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(s.x - e.radius, s.y - e.radius - 7, w, 3);
       ctx.fillStyle = "#7CFF8A"; ctx.fillRect(s.x - e.radius, s.y - e.radius - 7, w * frac, 3);
@@ -485,8 +590,8 @@ class Renderer {
 
   orb(o) {
     const { ctx, camera } = this, s = camera.worldToScreen(o.x, o.y);
-    const r = o.radius + Math.sin(o.bob) * 1.5;
-    ctx.save(); ctx.shadowColor = CONFIG.xp.color || "#ffd23f"; ctx.shadowBlur = 10;
+    const r = (o.radius + Math.sin(o.bob) * 1.6) * o.scale;
+    ctx.save(); ctx.shadowColor = "#ffd23f"; ctx.shadowBlur = 12;
     ctx.fillStyle = "#ffd23f";
     ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill();
     ctx.restore();
@@ -499,11 +604,11 @@ class Renderer {
       ctx.globalAlpha = a; ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(s.x, s.y, p.size, 0, TAU); ctx.fill();
     }
-    ctx.globalAlpha = 1;
-    ctx.font = "bold 14px Segoe UI, sans-serif"; ctx.textAlign = "center";
+    ctx.globalAlpha = 1; ctx.textAlign = "center";
     for (const t of ps.texts) {
-      const s = camera.worldToScreen(t.x, t.y);
-      ctx.globalAlpha = clamp(t.life / 0.9, 0, 1); ctx.fillStyle = t.color;
+      const s = camera.worldToScreen(t.x, t.y), a = clamp(t.life / t.maxLife, 0, 1);
+      ctx.globalAlpha = a; ctx.fillStyle = t.color;
+      ctx.font = `bold ${Math.round(14 * t.scale)}px Segoe UI, sans-serif`;
       ctx.fillText(t.text, s.x, s.y);
     }
     ctx.globalAlpha = 1; ctx.textAlign = "start";
@@ -511,27 +616,29 @@ class Renderer {
 }
 
 /* =========================================================================
-   UI — HUD + overlays. Talks to the DOM, reads game state.
+   UI — HUD + overlays + wave banner. DOM-driven, with tween helpers.
    ========================================================================= */
 class UI {
   constructor(game) {
     this.game = game;
     this.el = {
-      hp: document.getElementById("hp-fill"),
-      xp: document.getElementById("xp-fill"),
-      level: document.getElementById("level"),
-      fps: document.getElementById("fps"),
-      kills: document.getElementById("kills"),
-      coins: document.getElementById("coins"),
+      hp: document.getElementById("hp-fill"), xp: document.getElementById("xp-fill"),
+      level: document.getElementById("level"), fps: document.getElementById("fps"),
+      kills: document.getElementById("kills"), coins: document.getElementById("coins"),
+      wave: document.getElementById("wave-num"),
       cards: document.getElementById("cards"),
-      levelup: document.getElementById("overlay-levelup"),
-      pause: document.getElementById("overlay-pause"),
-      gameover: document.getElementById("overlay-gameover"),
-      goSummary: document.getElementById("go-summary"),
+      levelup: document.getElementById("overlay-levelup"), pause: document.getElementById("overlay-pause"),
+      gameover: document.getElementById("overlay-gameover"), goSummary: document.getElementById("go-summary"),
+      banner: document.getElementById("banner"),
+      bannerBig: document.querySelector("#banner .big"), bannerSub: document.querySelector("#banner .sub"),
     };
+    this._lastKills = 0; this._lastCoins = 0; this._lastWave = 1;
     document.getElementById("resume-btn").onclick = () => game.togglePause();
     document.getElementById("restart-btn").onclick = () => game.restart();
   }
+  // re-trigger a CSS "pop" animation on an element
+  _pop(el) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+
   update(fps) {
     const g = this.game, p = g.player;
     this.el.hp.style.width = (p.hp / p.maxHP * 100) + "%";
@@ -540,6 +647,15 @@ class UI {
     this.el.fps.textContent = Math.round(fps);
     this.el.kills.textContent = g.kills;
     this.el.coins.textContent = g.coins;
+    this.el.wave.textContent = g.waves.wave || 1;
+    // pop animations when counters change
+    if (g.kills !== this._lastKills) { this._pop(this.el.kills); this._lastKills = g.kills; }
+    if (g.coins !== this._lastCoins) { this._pop(this.el.coins); this._lastCoins = g.coins; }
+    if ((g.waves.wave || 1) !== this._lastWave) { this._pop(this.el.wave); this._lastWave = g.waves.wave || 1; }
+  }
+  banner(big, sub = "") {
+    this.el.bannerBig.textContent = big; this.el.bannerSub.textContent = sub;
+    this.el.banner.classList.remove("show"); void this.el.banner.offsetWidth; this.el.banner.classList.add("show");
   }
   showLevelUp(choices) {
     this.el.cards.innerHTML = "";
@@ -548,10 +664,17 @@ class UI {
       card.className = "card";
       card.innerHTML = `<div class="key">[${i + 1}]</div><div class="icon">${c.icon}</div>
                         <div class="name">${c.name}</div><div class="desc">${c.desc}</div>`;
-      card.onclick = () => this.game.chooseUpgrade(i);
+      card.onclick = () => this._selectCard(card, i);
       this.el.cards.appendChild(card);
     });
     this.el.levelup.classList.add("show");
+  }
+  // play a brief selection animation, then commit the choice
+  _selectCard(card, i) {
+    if (card.classList.contains("selected")) return;
+    [...this.el.cards.children].forEach(c => c.style.pointerEvents = "none");
+    card.classList.add("selected");
+    setTimeout(() => this.game.chooseUpgrade(i), 150);
   }
   hideLevelUp() { this.el.levelup.classList.remove("show"); }
   showPause(v) { this.el.pause.classList.toggle("show", v); }
@@ -560,7 +683,7 @@ class UI {
 }
 
 /* =========================================================================
-   Game — orchestrator. Owns the loop, state, and all systems.
+   Game — orchestrator. Owns loop, state, systems, pools, and combat rules.
    ========================================================================= */
 const STATE = { PLAYING: "PLAYING", LEVELUP: "LEVELUP", PAUSED: "PAUSED", GAMEOVER: "GAMEOVER" };
 
@@ -573,13 +696,17 @@ class Game {
     this.renderer = new Renderer(this.ctx, this.camera);
     this.particles = new ParticleSystem();
     this.upgrades = new UpgradeSystem(this);
+    this.waves = new WaveSystem(this);
     this.ui = new UI(this);
+
+    // object pools (enemies, xp orbs) — particles/text pooled inside ParticleSystem
+    this.enemyPool = new Pool(() => new Enemy());
+    this.orbPool = new Pool(() => new XPOrb());
 
     this._resize();
     addEventListener("resize", () => this._resize());
 
-    // upgrade hotkeys + pause keys
-    this.input.onSelect = (i) => { if (this.state === STATE.LEVELUP) this.chooseUpgrade(i); };
+    this.input.onSelect = (i) => { if (this.state === STATE.LEVELUP) this.ui._selectCard(this.ui.el.cards.children[i], i); };
     addEventListener("keydown", (e) => {
       if (e.code === "KeyP" || e.code === "Escape") { if (this.state === STATE.PLAYING || this.state === STATE.PAUSED) this.togglePause(); }
       if (e.code === "Enter" && this.state === STATE.GAMEOVER) this.restart();
@@ -587,25 +714,36 @@ class Game {
 
     this.reset();
     this.last = performance.now();
-    this._fpsAccum = 0; this._fpsFrames = 0; this.fps = 60;
+    this._fpsAccum = 0; this._fpsFrames = 0; this.fps = 60; this.hitStop = 0;
     requestAnimationFrame((t) => this.loop(t));
   }
 
   reset() {
     this.player = new Player();
     this.sword = new Sword(this.player);
-    this.spawner = new EnemySpawner();
-    this.enemies = [];
-    this.orbs = [];
-    this.particles.particles.length = 0;
-    this.particles.texts.length = 0;
-    this.camera.x = 0; this.camera.y = 0;
+    this.waves.reset();
+    this.enemies = []; this.orbs = [];
+    this.particles.clear();
+    this.camera.x = 0; this.camera.y = 0; this.camera.shake = 0;
     this.xp = 0; this.level = 1; this.xpNeeded = CONFIG.xp.perLevelBase;
-    this.kills = 0; this.coins = 0;
+    this.kills = 0; this.coins = 0; this.hitStop = 0;
     this.state = STATE.PLAYING;
   }
-
   _resize() { this.canvas.width = innerWidth; this.canvas.height = innerHeight; }
+
+  /* ---- spawning via pools ---- */
+  spawnEnemy(typeKey) {
+    const c = this.camera, w = c.canvas.width, h = c.canvas.height, pad = 60;
+    const side = Math.floor(rand(0, 4));
+    let sx, sy;
+    if (side === 0) { sx = rand(0, w); sy = -pad; }
+    else if (side === 1) { sx = w + pad; sy = rand(0, h); }
+    else if (side === 2) { sx = rand(0, w); sy = h + pad; }
+    else { sx = -pad; sy = rand(0, h); }
+    const wp = c.screenToWorld(sx, sy);
+    this.enemies.push(this.enemyPool.acquire().init(typeKey, wp.x, wp.y));
+  }
+  spawnOrb(x, y, value) { this.orbs.push(this.orbPool.acquire().init(x, y, value)); }
 
   /* ---- state transitions ---- */
   togglePause() {
@@ -617,7 +755,7 @@ class Game {
   levelUp() {
     this.level++;
     this.xp -= this.xpNeeded;
-    this.xpNeeded = CONFIG.xp.perLevelBase + (this.level - 1) * 5; // gentle curve
+    this.xpNeeded = CONFIG.xp.perLevelBase + (this.level - 1) * CONFIG.xp.perLevelGrowth;
     this.state = STATE.LEVELUP;
     this._choices = this.upgrades.roll();
     this.ui.showLevelUp(this._choices);
@@ -626,15 +764,37 @@ class Game {
     if (this.state !== STATE.LEVELUP || !this._choices[i]) return;
     this._choices[i].apply();
     this.ui.hideLevelUp();
-    // queue another level-up if enough XP carried over
-    if (this.xp >= this.xpNeeded) { this.levelUp(); }
+    if (this.xp >= this.xpNeeded) this.levelUp();
     else { this.state = STATE.PLAYING; this.last = performance.now(); }
   }
-
   gainXP(n) {
     this.xp += n;
-    this.coins += n; // coins track collected XP for now
+    this.coins += n + this.player.coinBonus;
     if (this.xp >= this.xpNeeded && this.state === STATE.PLAYING) this.levelUp();
+  }
+
+  /* ---- combat: single place that resolves a sword hit (crit/kb/juice) ---- */
+  _resolveSwordHit(e) {
+    const crit = Math.random() < this.player.critChance;
+    const dmg = crit ? this.sword.damage * CONFIG.combat.critMult : this.sword.damage;
+    e.hurt(dmg);
+    e.hitCooldown = CONFIG.combat.hitCooldown;
+    // knockback away from player
+    const dx = e.x - this.player.x, dy = e.y - this.player.y, d = Math.hypot(dx, dy) || 1;
+    e.applyKnockback(dx / d, dy / d, CONFIG.combat.knockback);
+    // juice: damage number, particles, hit stop, shake
+    this.particles.floatText(e.x, e.y - e.radius, Math.round(dmg) + (crit ? "!" : ""),
+                             crit ? "#ff6f3c" : "#ffffff", crit ? 1.6 : 1.0);
+    this.particles.burst(e.x, e.y, "#ffd2d8", crit ? 8 : 4, crit ? 180 : 120);
+    this.hitStop = Math.max(this.hitStop, CONFIG.combat.hitStop);
+    this.camera.addShake(crit ? 5 : 2);
+    if (e.dying) this._onEnemyDeath(e);
+  }
+  _onEnemyDeath(e) {
+    this.kills++;
+    this.camera.addShake(5);
+    this.particles.burst(e.x, e.y, e.color, 16, 240);
+    this.spawnOrb(e.x, e.y, CONFIG.xp.value);
   }
 
   /* ---- update ---- */
@@ -643,55 +803,57 @@ class Game {
     this.player.update(dt, dir);
     this.sword.update(dt);
     this.camera.follow(this.player, dt);
-    this.spawner.update(dt, this.player, this.camera, this.enemies);
+    this.waves.update(dt);
 
-    // enemies
-    const base = this.sword.base(), tip = this.sword.tip();
-    for (const e of this.enemies) {
+    const base = this.sword.base(), tip = this.sword.tip(), reach = this.sword.width / 2;
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const e = this.enemies[i];
       e.update(dt, this.player);
-      // sword collision (thick segment vs circle), throttled per enemy
-      if (e.hitCooldown <= 0 && Collision.segCircle(base.x, base.y, tip.x, tip.y, e.x, e.y, e.radius + this.sword.width / 2)) {
-        e.hurt(this.sword.damage);
-        e.hitCooldown = 0.12;
-        this.particles.burst(e.x, e.y, "#ffd2d8", 5, 120);
-        if (e.dead) this._onEnemyDeath(e);
+      if (!e.dying) {
+        if (e.hitCooldown <= 0 && Collision.segCircle(base.x, base.y, tip.x, tip.y, e.x, e.y, e.radius + reach))
+          this._resolveSwordHit(e);
+        if (!e.dying && Collision.circles(e.x, e.y, e.radius, this.player.x, this.player.y, this.player.radius))
+          this.player.damage(e.contactDPS * dt);
       }
-      // contact damage to player
-      if (!e.dead && Collision.circles(e.x, e.y, e.radius, this.player.x, this.player.y, this.player.radius)) {
-        this.player.damage(CONFIG.enemy.contactDPS * dt);
-      }
+      if (e.dead) { this.enemies.splice(i, 1); this.enemyPool.release(e); }
     }
-    this.enemies = this.enemies.filter((e) => !e.dead);
 
-    // orbs
-    for (const o of this.orbs) {
-      o.update(dt, this.player);
-      if (o.collected) { this.gainXP(o.value); this.particles.floatText(o.x, o.y, "+" + o.value + " XP"); }
-    }
-    this.orbs = this.orbs.filter((o) => !o.collected);
+    // XP orbs: update, merge nearby, collect
+    this._updateOrbs(dt);
 
     this.particles.update(dt);
-
     if (this.player.hp <= 0) this._gameOver();
   }
 
-  _onEnemyDeath(e) {
-    this.kills++;
-    this.camera.addShake(4);
-    this.particles.burst(e.x, e.y, CONFIG.enemy.color, 14, 220);
-    this.orbs.push(new XPOrb(e.x, e.y));
+  _updateOrbs(dt) {
+    const md = CONFIG.xp.mergeDist;
+    for (let i = this.orbs.length - 1; i >= 0; i--) {
+      const o = this.orbs[i];
+      o.update(dt, this.player);
+      // merge: fold a close-enough later orb into this one (cheap, n is small)
+      for (let j = i - 1; j >= 0; j--) {
+        const b = this.orbs[j];
+        if (!b.collected && Math.hypot(o.x - b.x, o.y - b.y) < md) {
+          b.value += o.value; o.collected = true; break;
+        }
+      }
+      if (o.collected) {
+        this.gainXP(o.value);
+        this.particles.floatText(o.x, o.y, "+" + o.value + " XP", "#ffe98a");
+        this.orbs.splice(i, 1); this.orbPool.release(o);
+      }
+    }
   }
 
   _gameOver() {
     this.state = STATE.GAMEOVER;
-    this.ui.showGameOver(`Level ${this.level} · ${this.kills} kills · ${this.coins} coins`);
+    this.ui.showGameOver(`Wave ${this.waves.wave} · Level ${this.level} · ${this.kills} kills · ${this.coins} coins`);
   }
 
   /* ---- render ---- */
   render() {
     const r = this.renderer;
-    r.clear();
-    r.grid();
+    r.clear(); r.grid();
     for (const o of this.orbs) r.orb(o);
     for (const e of this.enemies) r.enemy(e);
     r.sword(this.sword);
@@ -699,20 +861,21 @@ class Game {
     r.particles(this.particles);
   }
 
-  /* ---- main loop ---- */
+  /* ---- main loop (delta-time, with hit-stop) ---- */
   loop(now) {
-    let dt = (now - this.last) / 1000;
-    this.last = now;
-    dt = clamp(dt, 0, 0.05); // guard against tab stalls
+    let dt = (now - this.last) / 1000; this.last = now;
+    dt = clamp(dt, 0, 0.05);
 
-    // fps meter (smoothed, updated ~4x/sec)
     this._fpsAccum += dt; this._fpsFrames++;
     if (this._fpsAccum >= 0.25) { this.fps = this._fpsFrames / this._fpsAccum; this._fpsAccum = 0; this._fpsFrames = 0; }
 
-    if (this.state === STATE.PLAYING) this.update(dt);
+    if (this.hitStop > 0) {
+      this.hitStop -= dt;            // freeze simulation briefly for impact
+    } else if (this.state === STATE.PLAYING) {
+      this.update(dt);
+    }
     this.render();
     this.ui.update(this.fps);
-
     requestAnimationFrame((t) => this.loop(t));
   }
 }

@@ -5,72 +5,80 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>OrbitSlash — Prototype</title>
 <style>
-  :root { --accent: #4da3ff; --xp: #ffd23f; --crit: #ff6f3c; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0e16; }
-  body { font-family: "Segoe UI", system-ui, sans-serif; color: #e8eef7; touch-action: none; }
-  #game { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+  /* ====================================================================
+     Clean cartoon mobile UI: rounded, bright, high-contrast, soft shadows.
+     ==================================================================== */
+  :root { --accent:#36b6ff; --accent2:#1f93e6; --xp:#ffcf33; --crit:#ff7a3c; --panel:rgba(10,16,26,.42); --ink:#f4f9ff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#4f9d52; }
+  body { font-family:"Baloo 2","Segoe UI",system-ui,sans-serif; color:var(--ink); touch-action:none; -webkit-font-smoothing:antialiased; }
+  #game { display:block; width:100vw; height:100vh; cursor:crosshair; }
 
-  /* ---------- HUD ---------- */
-  .hud { position: fixed; pointer-events: none; z-index: 5; text-shadow: 0 1px 3px #000; }
-  #hud-tl { top: 14px; left: 16px; }
-  #hud-tr { top: 14px; right: 16px; text-align: right; }
-  #hud-top { top: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
-  #hud-bottom { bottom: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
-  .hud .row { font-size: 15px; line-height: 1.55; font-weight: 600; }
-  .bar { width: 190px; height: 12px; border-radius: 6px; background: #1c2535; overflow: hidden; margin-top: 2px; box-shadow: inset 0 0 0 1px #2c3950; }
-  .bar > span { display: block; height: 100%; transition: width .18s cubic-bezier(.2,.8,.2,1); }
-  #hp-fill { background: linear-gradient(90deg, #ff5a5a, #ff8c5a); }
-  #xp-fill { background: linear-gradient(90deg, #ffd23f, #ffe98a); }
-  .label { font-size: 11px; opacity: .7; letter-spacing: .06em; text-transform: uppercase; }
-  #coins, #kills { display: inline-block; }
-  #coins { font-size: 18px; font-weight: 700; color: var(--xp); }
-  #wave-num { font-size: 22px; font-weight: 800; letter-spacing: .04em; }
-  /* number "pop" tween when a stat increments */
-  .pop { animation: pop .28s cubic-bezier(.2,1.4,.4,1); }
-  @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.35)} 100%{transform:scale(1)} }
+  /* ---------- HUD: floating rounded glass panels ---------- */
+  .hud { position:fixed; z-index:5; pointer-events:none; background:var(--panel);
+         border:1.5px solid rgba(255,255,255,.14); border-radius:18px; padding:10px 14px;
+         box-shadow:0 6px 18px rgba(0,0,0,.25); backdrop-filter:blur(7px); }
+  #hud-tl { top:14px; left:14px; }
+  #hud-tr { top:14px; right:14px; text-align:right; }
+  #hud-top { top:14px; left:50%; transform:translateX(-50%); text-align:center; }
+  #hud-bottom { bottom:14px; left:50%; transform:translateX(-50%); text-align:center; }
+  .hud .row { font-size:15px; line-height:1.5; font-weight:700; }
+  .bar { width:188px; height:14px; border-radius:8px; background:rgba(0,0,0,.32); overflow:hidden;
+         margin-top:3px; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.12); }
+  .bar > span { display:block; height:100%; border-radius:8px; transition:width .22s cubic-bezier(.2,.8,.2,1); }
+  #hp-fill { background:linear-gradient(90deg,#ff5a6e,#ff9a5a); }
+  #xp-fill { background:linear-gradient(90deg,#ffcf33,#ffe98a); }
+  .label { font-size:11px; font-weight:700; opacity:.75; letter-spacing:.07em; text-transform:uppercase; }
+  #coins, #kills, #wave-num { display:inline-block; }
+  #coins { font-size:20px; font-weight:800; color:var(--xp); }
+  #wave-num { font-size:24px; font-weight:800; letter-spacing:.03em; }
+  .pop { animation:pop .28s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.4)} 100%{transform:scale(1)} }
 
-  /* ---------- Wave banner ---------- */
-  #banner { position: fixed; top: 32%; left: 50%; transform: translate(-50%,-50%); z-index: 8;
-            text-align: center; pointer-events: none; opacity: 0; }
-  #banner.show { animation: banner 2.0s ease forwards; }
-  #banner .big { font-size: 46px; font-weight: 800; text-shadow: 0 2px 18px rgba(77,163,255,.5); }
-  #banner .sub { font-size: 18px; opacity: .85; margin-top: 4px; }
+  /* ---------- Wave banner (pill) ---------- */
+  #banner { position:fixed; top:30%; left:50%; transform:translate(-50%,-50%); z-index:8;
+            text-align:center; pointer-events:none; opacity:0; }
+  #banner.show { animation:banner 2.0s ease forwards; }
+  #banner .big { display:inline-block; font-size:38px; font-weight:800; padding:10px 30px; border-radius:40px;
+                 background:rgba(10,16,26,.5); border:2px solid rgba(255,255,255,.18);
+                 box-shadow:0 8px 26px rgba(0,0,0,.35); backdrop-filter:blur(6px); }
+  #banner .sub { font-size:17px; font-weight:700; opacity:.9; margin-top:8px; }
   @keyframes banner {
-    0% { opacity: 0; transform: translate(-50%,-50%) scale(.8); }
-    15% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-    80% { opacity: 1; }
-    100% { opacity: 0; transform: translate(-50%,-50%) scale(1.05); }
-  }
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.8)} 15%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    80%{opacity:1} 100%{opacity:0;transform:translate(-50%,-50%) scale(1.06)} }
 
   /* ---------- Overlays ---------- */
-  .overlay { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
-             flex-direction: column; background: rgba(8,12,20,.78); backdrop-filter: blur(3px); }
-  .overlay.show { display: flex; animation: fade .2s ease; }
+  .overlay { position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center;
+             flex-direction:column; background:rgba(8,14,24,.7); backdrop-filter:blur(4px); }
+  .overlay.show { display:flex; animation:fade .2s ease; }
   @keyframes fade { from{opacity:0} to{opacity:1} }
-  .overlay h1 { font-size: 40px; margin-bottom: 6px; letter-spacing: .02em; }
-  .overlay h2 { font-size: 24px; margin-bottom: 22px; color: var(--accent); }
-  .overlay p { opacity: .8; margin-bottom: 18px; }
+  .overlay h1 { font-size:42px; font-weight:800; margin-bottom:4px; }
+  .overlay h2 { font-size:23px; font-weight:700; margin-bottom:22px; color:var(--accent); }
+  .overlay p { opacity:.85; margin-bottom:18px; }
 
-  .cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; max-width: 760px; }
-  .card { width: 210px; min-height: 150px; background: #131c2c; border: 2px solid #243349; border-radius: 14px;
-          padding: 18px; cursor: pointer; transition: transform .12s, border-color .12s, box-shadow .12s; text-align: left;
-          animation: cardIn .28s cubic-bezier(.2,1.1,.3,1) backwards; }
+  .cards { display:flex; gap:18px; flex-wrap:wrap; justify-content:center; max-width:760px; }
+  .card { width:212px; min-height:152px; background:linear-gradient(180deg,#1d2942,#16223a); border:2.5px solid #2c3f5e;
+          border-radius:20px; padding:18px; cursor:pointer; text-align:left;
+          transition:transform .12s,border-color .12s,box-shadow .12s;
+          animation:cardIn .3s cubic-bezier(.2,1.1,.3,1) backwards; }
   .card:nth-child(1){animation-delay:.02s} .card:nth-child(2){animation-delay:.08s} .card:nth-child(3){animation-delay:.14s}
-  @keyframes cardIn { from{opacity:0; transform:translateY(18px) scale(.96)} to{opacity:1; transform:none} }
-  .card:hover { transform: translateY(-5px); border-color: var(--accent); box-shadow: 0 8px 26px rgba(77,163,255,.25); }
-  .card.selected { animation: cardPick .18s ease forwards; border-color: var(--xp); box-shadow: 0 0 30px rgba(255,210,63,.5); }
+  @keyframes cardIn { from{opacity:0;transform:translateY(20px) scale(.95)} to{opacity:1;transform:none} }
+  .card:hover { transform:translateY(-6px); border-color:var(--accent); box-shadow:0 12px 30px rgba(54,182,255,.3); }
+  .card.selected { animation:cardPick .18s ease forwards; border-color:var(--xp); box-shadow:0 0 34px rgba(255,207,51,.55); }
   @keyframes cardPick { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1.05)} }
-  .card .key { font-size: 12px; opacity: .55; }
-  .card .icon { font-size: 30px; margin: 4px 0 10px; }
-  .card .name { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
-  .card .desc { font-size: 13px; opacity: .8; line-height: 1.4; }
+  .card .key { font-size:12px; font-weight:700; opacity:.5; }
+  .card .icon { font-size:34px; margin:6px 0 10px; }
+  .card .name { font-size:17px; font-weight:800; margin-bottom:6px; }
+  .card .desc { font-size:13px; opacity:.82; line-height:1.4; }
 
-  .btn { pointer-events: auto; margin-top: 8px; padding: 12px 30px; font-size: 16px; font-weight: 700; color: #06101e;
-         background: var(--accent); border: none; border-radius: 10px; cursor: pointer; transition: filter .1s, transform .1s; }
-  .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+  .btn { pointer-events:auto; margin-top:8px; padding:14px 34px; font-size:16px; font-weight:800; color:#06121f;
+         background:linear-gradient(180deg,var(--accent),var(--accent2)); border:none; border-radius:30px;
+         cursor:pointer; box-shadow:0 6px 16px rgba(54,182,255,.4); transition:transform .1s,filter .1s; }
+  .btn:hover { filter:brightness(1.08); transform:translateY(-2px); }
+  .btn:active { transform:translateY(1px); }
 
-  #hint { position: fixed; bottom: 14px; left: 16px; z-index: 5; font-size: 12px; opacity: .45; pointer-events: none; }
+  #hint { position:fixed; bottom:14px; left:14px; z-index:5; font-size:12px; font-weight:600; opacity:.55;
+          pointer-events:none; background:var(--panel); padding:7px 12px; border-radius:14px; backdrop-filter:blur(6px); }
 </style>
 </head>
 <body>
@@ -125,31 +133,39 @@
 "use strict";
 
 /* =========================================================================
-   CONFIG — single source of truth for tuning (becomes Godot Resources later).
-   No magic numbers in the systems below; tune everything from here.
+   CONFIG — single source of truth. Gameplay tuning + ART palette.
+   The `art` block defines a small, consistent cartoon palette so every
+   drawn "asset" stays on-style (think reusable asset pack).
    ========================================================================= */
 const CONFIG = {
-  player: { radius: 16, speed: 260, maxHP: 100, color: "#4da3ff", accel: 0.18,
-            squash: 0.18 /* velocity-driven squash & stretch amount */ },
+  player: { radius: 16, speed: 260, maxHP: 100, color: "#4da3ff", accel: 0.18, squash: 0.16 },
   sword:  { length: 70, width: 12, rotSpeed: 3.2, damage: 25, orbit: 30, color: "#cfe6ff",
-            rotEase: 8 /* how fast rotSpeed changes interpolate (swing feel) */,
-            trailLife: 0.18 },
-  combat: { critChance: 0.08, critMult: 2.0, hitStop: 0.045 /* s freeze on hit */,
+            rotEase: 8, trailLife: 0.18 },
+  combat: { critChance: 0.08, critMult: 2.0, hitStop: 0.045,
             knockback: 240, knockbackFriction: 0.86, hitCooldown: 0.12 },
-  // Enemy archetypes: color / size / speed / hp all differ per type.
   enemyTypes: {
-    normal: { hp: 50,  speed: 72,  radius: 14, color: "#ff5a6e", contactDPS: 22, kbResist: 1.0,  introWave: 1 },
-    fast:   { hp: 24,  speed: 150, radius: 10, color: "#ffb454", contactDPS: 15, kbResist: 1.5,  introWave: 2 },
-    tank:   { hp: 170, speed: 38,  radius: 23, color: "#b06bff", contactDPS: 34, kbResist: 0.4,  introWave: 3 },
-    ranged: { hp: 42,  speed: 88,  radius: 13, color: "#5ad1c4", contactDPS: 18, kbResist: 1.0,  introWave: 3, ranged: true },
+    normal: { hp: 50,  speed: 72,  radius: 14, color: "#ff5a6e", contactDPS: 22, kbResist: 1.0, introWave: 1 },
+    fast:   { hp: 24,  speed: 150, radius: 11, color: "#ffb454", contactDPS: 15, kbResist: 1.5, introWave: 2 },
+    tank:   { hp: 170, speed: 38,  radius: 24, color: "#9b6bff", contactDPS: 34, kbResist: 0.4, introWave: 3 },
+    ranged: { hp: 42,  speed: 88,  radius: 14, color: "#39d0bf", contactDPS: 18, kbResist: 1.0, introWave: 3, ranged: true },
   },
   wave:   { firstDelay: 1.4, restTime: 2.6, baseCount: 8, countGrowth: 4,
             baseInterval: 1.05, intervalDecay: 0.9, minInterval: 0.3 },
   xp:     { radius: 6, value: 1, magnetRange: 110, magnetSpeed: 560, perLevelBase: 10, perLevelGrowth: 5,
             mergeDist: 14, popTime: 0.25 },
-  grid:   { size: 64, color: "#16202f", axis: "#1d2a3d" },
   camera: { smooth: 6, shakeMax: 22, shakeDecay: 60 },
   fx:     { dmgRise: 46, dmgLife: 0.8, deathAnim: 0.18 },
+  // ----- Art direction: clean cartoon, 3–5 colours per asset, dark outline -----
+  art: {
+    outline: "#1e2b3d",
+    shadow:  "rgba(0,0,0,0.18)",
+    grass:   { base: "#5aa95d", alt: "#54a257", tuft: "#3f8a44", cell: 150 },
+    player:  { skin: "#f4c79a", hair: "#5b3a29", outfit: "#4da3ff", outfitDark: "#2f7fd6", boots: "#3c2f26" },
+    sword:   { blade: "#e2ecf5", edge: "#ffffff", guard: "#d4a83a", grip: "#7a5230", gripBind: "#5c3d24" },
+    tree:    { trunk: "#7a5230", trunkDark: "#5d3e23", leaf: "#3f9a4b", leafDark: "#2f7a3a", leafHi: "#57b362" },
+    stone:   { body: "#9aa3ad", dark: "#717983", hi: "#bcc3cb" },
+    bush:    { body: "#3f8f49", dark: "#2e6e37" },
+  },
 };
 
 /* =========================================================================
@@ -159,11 +175,17 @@ const rand  = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp  = (a, b, t) => a + (b - a) * t;
 const TAU   = Math.PI * 2;
-// frame-rate independent smoothing factor for exp lerp
 const smoothT = (rate, dt) => 1 - Math.exp(-rate * dt);
+// deterministic 0..1 value per integer cell — lets the world scatter
+// decorations infinitely & stably without storing any objects.
+function cellRand(x, y, seed = 0) {
+  let h = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 2147483647)) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 
 /* =========================================================================
-   Pool — generic object pool. One job: recycle objects to avoid GC churn.
+   Pool — generic object pool (recycle to avoid GC churn).
    ========================================================================= */
 class Pool {
   constructor(factory) { this.factory = factory; this.free = []; }
@@ -172,8 +194,7 @@ class Pool {
 }
 
 /* =========================================================================
-   Input — keyboard, mouse, virtual joystick. One responsibility: read intent.
-   (Unchanged from Sprint 1 except documented hotkeys.)
+   Input — keyboard, mouse, virtual joystick.
    ========================================================================= */
 class Input {
   constructor(canvas) {
@@ -181,7 +202,7 @@ class Input {
     this.keys = new Set();
     this.mouse = { x: 0, y: 0, down: false };
     this.joy = { active: false, baseX: 0, baseY: 0, dx: 0, dy: 0, id: null };
-    this.onSelect = null; // upgrade hotkeys 1/2/3
+    this.onSelect = null;
 
     addEventListener("keydown", (e) => {
       this.keys.add(e.code);
@@ -190,38 +211,25 @@ class Input {
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();
     });
     addEventListener("keyup", (e) => this.keys.delete(e.code));
-
     canvas.addEventListener("mousedown", (e) => { this.mouse.down = true; this._setMouse(e); });
     addEventListener("mouseup", () => this.mouse.down = false);
     canvas.addEventListener("mousemove", (e) => this._setMouse(e));
-
     canvas.addEventListener("touchstart", (e) => this._touchStart(e), { passive: false });
     canvas.addEventListener("touchmove",  (e) => this._touchMove(e),  { passive: false });
     canvas.addEventListener("touchend",   (e) => this._touchEnd(e));
   }
-  _setMouse(e) {
-    const r = this.canvas.getBoundingClientRect();
-    this.mouse.x = e.clientX - r.left; this.mouse.y = e.clientY - r.top;
-  }
-  _touchStart(e) {
-    e.preventDefault();
-    const t = e.changedTouches[0];
-    this.joy = { active: true, baseX: t.clientX, baseY: t.clientY, dx: 0, dy: 0, id: t.identifier };
-  }
+  _setMouse(e) { const r = this.canvas.getBoundingClientRect(); this.mouse.x = e.clientX - r.left; this.mouse.y = e.clientY - r.top; }
+  _touchStart(e) { e.preventDefault(); const t = e.changedTouches[0]; this.joy = { active: true, baseX: t.clientX, baseY: t.clientY, dx: 0, dy: 0, id: t.identifier }; }
   _touchMove(e) {
     e.preventDefault();
     for (const t of e.changedTouches) {
       if (t.identifier !== this.joy.id) continue;
-      const max = 60;
-      let dx = t.clientX - this.joy.baseX, dy = t.clientY - this.joy.baseY;
+      const max = 60; let dx = t.clientX - this.joy.baseX, dy = t.clientY - this.joy.baseY;
       const len = Math.hypot(dx, dy) || 1, c = Math.min(len, max) / len;
       this.joy.dx = (dx * c) / max; this.joy.dy = (dy * c) / max;
     }
   }
-  _touchEnd(e) {
-    for (const t of e.changedTouches)
-      if (t.identifier === this.joy.id) this.joy = { active: false, baseX: 0, baseY: 0, dx: 0, dy: 0, id: null };
-  }
+  _touchEnd(e) { for (const t of e.changedTouches) if (t.identifier === this.joy.id) this.joy = { active: false, baseX: 0, baseY: 0, dx: 0, dy: 0, id: null }; }
   getMoveVector(player, camera) {
     let x = 0, y = 0;
     if (this.keys.has("KeyW") || this.keys.has("ArrowUp"))    y -= 1;
@@ -240,31 +248,23 @@ class Input {
 }
 
 /* =========================================================================
-   Camera — follows player, smoothing + screen shake, world<->screen.
+   Camera — follow + smoothing + screen shake.
    ========================================================================= */
 class Camera {
   constructor(canvas) { this.canvas = canvas; this.x = 0; this.y = 0; this.shake = 0; this.ox = 0; this.oy = 0; }
   follow(target, dt) {
     const t = smoothT(CONFIG.camera.smooth, dt);
-    this.x += (target.x - this.x) * t;
-    this.y += (target.y - this.y) * t;
-    if (this.shake > 0) {
-      const m = this.shake;
-      this.ox = rand(-m, m); this.oy = rand(-m, m);
-      this.shake = Math.max(0, this.shake - CONFIG.camera.shakeDecay * dt);
-    } else { this.ox = this.oy = 0; }
+    this.x += (target.x - this.x) * t; this.y += (target.y - this.y) * t;
+    if (this.shake > 0) { const m = this.shake; this.ox = rand(-m, m); this.oy = rand(-m, m); this.shake = Math.max(0, this.shake - CONFIG.camera.shakeDecay * dt); }
+    else { this.ox = this.oy = 0; }
   }
   addShake(amount) { this.shake = Math.min(CONFIG.camera.shakeMax, this.shake + amount); }
-  worldToScreen(x, y) {
-    return { x: x - this.x + this.canvas.width / 2 + this.ox, y: y - this.y + this.canvas.height / 2 + this.oy };
-  }
-  screenToWorld(x, y) {
-    return { x: x + this.x - this.canvas.width / 2 - this.ox, y: y + this.y - this.canvas.height / 2 - this.oy };
-  }
+  worldToScreen(x, y) { return { x: x - this.x + this.canvas.width / 2 + this.ox, y: y - this.y + this.canvas.height / 2 + this.oy }; }
+  screenToWorld(x, y) { return { x: x + this.x - this.canvas.width / 2 - this.ox, y: y + this.y - this.canvas.height / 2 - this.oy }; }
 }
 
 /* =========================================================================
-   Player — blue circle. Movement, health, squash & stretch.
+   Player — cartoon human. Movement + health + animation state (idle/walk/hit).
    ========================================================================= */
 class Player {
   constructor() {
@@ -272,38 +272,35 @@ class Player {
     this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
     this.radius = c.radius; this.speed = c.speed;
     this.maxHP = c.maxHP; this.hp = c.maxHP;
-    this.hitFlash = 0;
+    this.hitFlash = 0; this.animTime = 0; this.facing = 1;
     this.critChance = CONFIG.combat.critChance;
-    this.coinBonus = 0; // extra coins per orb from "+Coin Magnet"
+    this.coinBonus = 0;
   }
   update(dt, dir) {
     const tvx = dir.x * this.speed, tvy = dir.y * this.speed;
     const a = 1 - Math.pow(1 - CONFIG.player.accel, dt * 60);
     this.vx += (tvx - this.vx) * a; this.vy += (tvy - this.vy) * a;
     this.x += this.vx * dt; this.y += this.vy * dt;
+    this.animTime += dt;
+    if (Math.abs(this.vx) > 8) this.facing = this.vx > 0 ? 1 : -1; // face travel dir
     if (this.hitFlash > 0) this.hitFlash -= dt;
   }
-  // squash factor along the velocity axis (1 = none); used by Renderer.
   get speedRatio() { return clamp(Math.hypot(this.vx, this.vy) / this.speed, 0, 1); }
   damage(amount) { this.hp = Math.max(0, this.hp - amount); this.hitFlash = 0.15; }
 }
 
 /* =========================================================================
-   Sword — rotating rectangle around player. Eased rotation + trail.
+   Sword — orbiting blade (drawn as a fantasy sword by the Renderer).
    ========================================================================= */
 class Sword {
   constructor(player) {
     const s = CONFIG.sword;
-    this.player = player;
-    this.angle = 0;
+    this.player = player; this.angle = 0;
     this.length = s.length; this.width = s.width;
-    this.rotSpeed = s.rotSpeed;       // target rotation speed
-    this.curRotSpeed = s.rotSpeed;    // eased actual (smooth swing accel)
-    this.damage = s.damage; this.orbit = s.orbit;
-    this.trail = [];
+    this.rotSpeed = s.rotSpeed; this.curRotSpeed = s.rotSpeed;
+    this.damage = s.damage; this.orbit = s.orbit; this.trail = [];
   }
   update(dt) {
-    // interpolate rotation speed so upgrades ramp in smoothly (swing feel)
     this.curRotSpeed = lerp(this.curRotSpeed, this.rotSpeed, smoothT(CONFIG.sword.rotEase, dt));
     this.angle = (this.angle + this.curRotSpeed * dt) % TAU;
     const tip = this.tip();
@@ -318,29 +315,27 @@ class Sword {
 }
 
 /* =========================================================================
-   Enemy — poolable homing entity. Type-driven stats, knockback, death anim.
+   Enemy — poolable cartoon blob. Type-driven stats + idle wobble + death anim.
    ========================================================================= */
 class Enemy {
-  // init() lets the pool recycle a single instance.
   init(typeKey, x, y) {
     const t = CONFIG.enemyTypes[typeKey];
     this.type = typeKey;
-    this.x = x; this.y = y; this.vx = 0; this.vy = 0; // vx/vy = knockback velocity
+    this.x = x; this.y = y; this.vx = 0; this.vy = 0;
     this.radius = t.radius; this.baseRadius = t.radius;
     this.speed = t.speed * rand(0.9, 1.15);
     this.hp = t.hp; this.maxHP = t.hp;
     this.color = t.color; this.contactDPS = t.contactDPS; this.kbResist = t.kbResist;
     this.dead = false; this.dying = false; this.deathT = 0;
-    this.hitFlash = 0; this.hitCooldown = 0; this.squash = 0;
+    this.hitFlash = 0; this.hitCooldown = 0; this.squash = 0; this.animTime = rand(0, 10);
     return this;
   }
   update(dt, player) {
+    this.animTime += dt;
     if (this.dying) { this.deathT -= dt; if (this.deathT <= 0) this.dead = true; return; }
-    // homing
     const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy) || 1;
     this.x += (dx / d) * this.speed * dt + this.vx * dt;
     this.y += (dy / d) * this.speed * dt + this.vy * dt;
-    // knockback decay
     this.vx *= CONFIG.combat.knockbackFriction; this.vy *= CONFIG.combat.knockbackFriction;
     if (this.hitFlash > 0) this.hitFlash -= dt;
     if (this.hitCooldown > 0) this.hitCooldown -= dt;
@@ -349,18 +344,15 @@ class Enemy {
   hurt(amount) { this.hp -= amount; this.hitFlash = 0.1; this.squash = 0.18; if (this.hp <= 0) this._beginDeath(); }
   applyKnockback(dirx, diry, force) { const f = force / this.kbResist; this.vx += dirx * f; this.vy += diry * f; }
   _beginDeath() { this.dying = true; this.deathT = CONFIG.fx.deathAnim; }
-  // true only on the frame death begins (handled in Game via dying flag)
 }
 
 /* =========================================================================
-   WaveSystem — replaces endless spawn. Waves scale count + interval; emits
-   "Wave N" / "Wave Complete" banners. One job: pace enemy pressure.
+   WaveSystem — scaling waves with start/complete banners.
    ========================================================================= */
 class WaveSystem {
   constructor(game) { this.game = game; this.reset(); }
   reset() {
-    this.wave = 0;
-    this.phase = "REST";          // REST -> SPAWNING -> CLEARING -> REST
+    this.wave = 0; this.phase = "REST";
     this.restTimer = CONFIG.wave.firstDelay;
     this.toSpawn = 0; this.spawnTimer = 0; this.interval = CONFIG.wave.baseInterval;
   }
@@ -369,36 +361,23 @@ class WaveSystem {
     this.wave++;
     this.toSpawn = w.baseCount + (this.wave - 1) * w.countGrowth;
     this.interval = Math.max(w.minInterval, w.baseInterval * Math.pow(w.intervalDecay, this.wave - 1));
-    this.spawnTimer = 0;
-    this.phase = "SPAWNING";
+    this.spawnTimer = 0; this.phase = "SPAWNING";
     this.game.ui.banner("Wave " + this.wave, this.toSpawn + " enemies incoming");
   }
   update(dt) {
     const g = this.game;
-    if (this.phase === "REST") {
-      this.restTimer -= dt;
-      if (this.restTimer <= 0) this._startWave();
-    } else if (this.phase === "SPAWNING") {
+    if (this.phase === "REST") { this.restTimer -= dt; if (this.restTimer <= 0) this._startWave(); }
+    else if (this.phase === "SPAWNING") {
       this.spawnTimer -= dt;
-      if (this.spawnTimer <= 0 && this.toSpawn > 0) {
-        g.spawnEnemy(this._pickType());
-        this.toSpawn--; this.spawnTimer = this.interval;
-      }
+      if (this.spawnTimer <= 0 && this.toSpawn > 0) { g.spawnEnemy(this._pickType()); this.toSpawn--; this.spawnTimer = this.interval; }
       if (this.toSpawn <= 0) this.phase = "CLEARING";
     } else if (this.phase === "CLEARING") {
-      if (g.enemies.length === 0) {
-        this.game.ui.banner("Wave " + this.wave + " Complete", "Get ready…");
-        this.phase = "REST"; this.restTimer = CONFIG.wave.restTime;
-      }
+      if (g.enemies.length === 0) { this.game.ui.banner("Wave " + this.wave + " Complete", "Get ready…"); this.phase = "REST"; this.restTimer = CONFIG.wave.restTime; }
     }
   }
-  // weighted random type, gated by the wave each type is introduced in
   _pickType() {
     const pool = [];
-    for (const key in CONFIG.enemyTypes) {
-      if (this.wave >= CONFIG.enemyTypes[key].introWave) pool.push(key);
-    }
-    // bias toward tougher types in later waves
+    for (const key in CONFIG.enemyTypes) if (this.wave >= CONFIG.enemyTypes[key].introWave) pool.push(key);
     if (this.wave >= 4 && Math.random() < 0.25) return "tank";
     return pool[Math.floor(rand(0, pool.length))];
   }
@@ -411,8 +390,7 @@ class XPOrb {
   init(x, y, value) {
     this.x = x; this.y = y; this.value = value;
     this.radius = CONFIG.xp.radius; this.collected = false;
-    this.bob = rand(0, TAU); this.life = 0; this.scale = 0; // scale pops 0->1
-    // small "burst out" velocity so orbs scatter on spawn
+    this.bob = rand(0, TAU); this.life = 0; this.scale = 0;
     const a = rand(0, TAU), s = rand(40, 110);
     this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
     return this;
@@ -420,15 +398,9 @@ class XPOrb {
   update(dt, player) {
     this.life += dt; this.bob += dt * 5;
     this.scale = clamp(this.life / CONFIG.xp.popTime, 0, 1);
-    // initial scatter slows down
-    this.x += this.vx * dt; this.y += this.vy * dt;
-    this.vx *= 0.9; this.vy *= 0.9;
-    // magnet toward player (eased, accelerates as it nears)
+    this.x += this.vx * dt; this.y += this.vy * dt; this.vx *= 0.9; this.vy *= 0.9;
     const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy) || 1;
-    if (d < CONFIG.xp.magnetRange) {
-      const pull = CONFIG.xp.magnetSpeed * (1 - d / CONFIG.xp.magnetRange) + 70;
-      this.x += (dx / d) * pull * dt; this.y += (dy / d) * pull * dt;
-    }
+    if (d < CONFIG.xp.magnetRange) { const pull = CONFIG.xp.magnetSpeed * (1 - d / CONFIG.xp.magnetRange) + 70; this.x += (dx / d) * pull * dt; this.y += (dy / d) * pull * dt; }
     if (d < player.radius + this.radius) this.collected = true;
   }
 }
@@ -447,14 +419,10 @@ const Collision = {
 };
 
 /* =========================================================================
-   ParticleSystem — pooled particles + floating damage/XP text (also pooled).
+   ParticleSystem — pooled particles + floating text.
    ========================================================================= */
 class ParticleSystem {
-  constructor() {
-    this.particles = []; this.texts = [];
-    this._pPool = new Pool(() => ({}));
-    this._tPool = new Pool(() => ({}));
-  }
+  constructor() { this.particles = []; this.texts = []; this._pPool = new Pool(() => ({})); this._tPool = new Pool(() => ({})); }
   burst(x, y, color, count = 10, power = 180) {
     for (let i = 0; i < count; i++) {
       const a = rand(0, TAU), s = rand(power * 0.3, power), p = this._pPool.acquire();
@@ -463,7 +431,6 @@ class ParticleSystem {
       this.particles.push(p);
     }
   }
-  // floating text: damage numbers (crit = bigger/colored) and XP gains
   floatText(x, y, text, color = "#ffd23f", scale = 1) {
     const t = this._tPool.acquire();
     t.x = x + rand(-6, 6); t.y = y; t.text = text; t.color = color;
@@ -485,138 +452,242 @@ class ParticleSystem {
 }
 
 /* =========================================================================
-   UpgradeSystem — data-driven defs; rolls 3 DISTINCT random upgrades.
+   UpgradeSystem — rolls 3 distinct random upgrades.
    ========================================================================= */
 class UpgradeSystem {
   constructor(game) {
-    this.game = game;
-    const g = game;
+    this.game = game; const g = game;
     this.all = [
-      { icon: "💥", name: "+20% Damage",        desc: "Hit harder per slash.",         apply: () => g.sword.damage *= 1.20 },
-      { icon: "🌀", name: "+10% Attack Speed",  desc: "The blade orbits faster.",      apply: () => g.sword.rotSpeed *= 1.10 },
-      { icon: "📏", name: "+10% Sword Radius",  desc: "Greater reach on every swing.", apply: () => g.sword.length *= 1.10 },
-      { icon: "❤️", name: "+15 Max HP",         desc: "Tougher to take down.",         apply: () => { g.player.maxHP += 15; g.player.hp += 15; } },
-      { icon: "🎯", name: "+5% Critical",       desc: "More double-damage crits.",     apply: () => g.player.critChance += 0.05 },
-      { icon: "👟", name: "+15% Move Speed",    desc: "Dodge and reposition faster.",  apply: () => g.player.speed *= 1.15 },
-      { icon: "🛡️", name: "+10% Knockback",     desc: "Shove enemies back harder.",    apply: () => CONFIG.combat.knockback *= 1.10 },
-      { icon: "🧲", name: "+XP Magnet",         desc: "Collect orbs from farther.",    apply: () => CONFIG.xp.magnetRange *= 1.25 },
-      { icon: "🪙", name: "+Coin Magnet",       desc: "Earn an extra coin per orb.",   apply: () => g.player.coinBonus += 1 },
+      { icon: "💥", name: "+20% Damage",       desc: "Hit harder per slash.",         apply: () => g.sword.damage *= 1.20 },
+      { icon: "🌀", name: "+10% Attack Speed", desc: "The blade orbits faster.",      apply: () => g.sword.rotSpeed *= 1.10 },
+      { icon: "📏", name: "+10% Sword Radius", desc: "Greater reach on every swing.", apply: () => g.sword.length *= 1.10 },
+      { icon: "❤️", name: "+15 Max HP",        desc: "Tougher to take down.",         apply: () => { g.player.maxHP += 15; g.player.hp += 15; } },
+      { icon: "🎯", name: "+5% Critical",      desc: "More double-damage crits.",     apply: () => g.player.critChance += 0.05 },
+      { icon: "👟", name: "+15% Move Speed",   desc: "Dodge and reposition faster.",  apply: () => g.player.speed *= 1.15 },
+      { icon: "🛡️", name: "+10% Knockback",    desc: "Shove enemies back harder.",    apply: () => CONFIG.combat.knockback *= 1.10 },
+      { icon: "🧲", name: "+XP Magnet",        desc: "Collect orbs from farther.",    apply: () => CONFIG.xp.magnetRange *= 1.25 },
+      { icon: "🪙", name: "+Coin Magnet",      desc: "Earn an extra coin per orb.",   apply: () => g.player.coinBonus += 1 },
     ];
   }
-  // pick three distinct upgrades — no duplicates within one selection
-  roll() {
-    const pool = [...this.all], out = [];
-    for (let i = 0; i < 3 && pool.length; i++) out.push(pool.splice(Math.floor(rand(0, pool.length)), 1)[0]);
-    return out;
-  }
+  roll() { const pool = [...this.all], out = []; for (let i = 0; i < 3 && pool.length; i++) out.push(pool.splice(Math.floor(rand(0, pool.length)), 1)[0]); return out; }
 }
 
 /* =========================================================================
-   Renderer — ALL canvas drawing. Decoupled so a Godot port can delete it.
+   Renderer — ALL drawing. Cartoon mobile style, dark outlines, simple shapes.
+   Each draw method is a self-contained "asset" so it can later be swapped
+   for a sprite without touching gameplay code.
    ========================================================================= */
 class Renderer {
   constructor(ctx, camera) { this.ctx = ctx; this.camera = camera; }
-  clear() { const { ctx } = this; ctx.fillStyle = "#0a0e16"; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
 
-  grid() {
-    const { ctx, camera } = this, g = CONFIG.grid, w = ctx.canvas.width, h = ctx.canvas.height;
-    const startX = Math.floor((camera.x - w / 2) / g.size) * g.size;
-    const startY = Math.floor((camera.y - h / 2) / g.size) * g.size;
-    ctx.lineWidth = 1;
-    for (let x = startX; x < camera.x + w / 2 + g.size; x += g.size) {
-      const s = camera.worldToScreen(x, 0);
-      ctx.strokeStyle = (x === 0) ? g.axis : g.color;
-      ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, h); ctx.stroke();
-    }
-    for (let y = startY; y < camera.y + h / 2 + g.size; y += g.size) {
-      const s = camera.worldToScreen(0, y);
-      ctx.strokeStyle = (y === 0) ? g.axis : g.color;
-      ctx.beginPath(); ctx.moveTo(0, s.y); ctx.lineTo(w, s.y); ctx.stroke();
-    }
+  // rounded-rect path helper (top-left origin) — the backbone of the cartoon look
+  _rr(x, y, w, h, r) {
+    const c = this.ctx; r = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
   }
 
+  clear() { const { ctx } = this; ctx.fillStyle = CONFIG.art.grass.base; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
+
+  /* ---- Environment: minimalist stylized grass + scattered props ---- */
+  environment() {
+    const { ctx, camera } = this, A = CONFIG.art.grass, w = ctx.canvas.width, h = ctx.canvas.height, cs = A.cell;
+    ctx.fillStyle = A.base; ctx.fillRect(0, 0, w, h);
+    const x0 = Math.floor((camera.x - w / 2) / cs) - 1, x1 = Math.floor((camera.x + w / 2) / cs) + 1;
+    const y0 = Math.floor((camera.y - h / 2) / cs) - 1, y1 = Math.floor((camera.y + h / 2) / cs) + 1;
+    // subtle checkerboard patches for depth
+    ctx.fillStyle = A.alt;
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+      if ((cx + cy) & 1) { const s = camera.worldToScreen(cx * cs, cy * cs); ctx.fillRect(s.x, s.y, cs + 1, cs + 1); }
+    }
+    // one deterministic decoration per cell
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+      const roll = cellRand(cx, cy);
+      const px = cx * cs + cellRand(cx, cy, 1) * cs, py = cy * cs + cellRand(cx, cy, 2) * cs;
+      const s = camera.worldToScreen(px, py);
+      if (roll < 0.09)      this._tree(s.x, s.y, 0.85 + cellRand(cx, cy, 3) * 0.5);
+      else if (roll < 0.22) this._bush(s.x, s.y);
+      else if (roll < 0.38) this._stone(s.x, s.y);
+      else if (roll < 0.70) this._tuft(s.x, s.y);
+    }
+  }
+  _tuft(x, y) { const c = this.ctx; c.strokeStyle = CONFIG.art.grass.tuft; c.lineWidth = 2.5; c.lineCap = "round";
+    for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(x + i * 4, y + 3); c.lineTo(x + i * 4 - i * 2, y - 6); c.stroke(); } }
+  _stone(x, y) { const c = this.ctx, S = CONFIG.art.stone;
+    c.fillStyle = S.body; c.strokeStyle = S.dark; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(x, y, 9, 7, 0, 0, TAU); c.fill(); c.stroke();
+    c.fillStyle = S.hi; c.beginPath(); c.ellipse(x - 2, y - 2, 4, 2.6, 0, 0, TAU); c.fill(); }
+  _bush(x, y) { const c = this.ctx, B = CONFIG.art.bush;
+    c.fillStyle = B.body; c.strokeStyle = B.dark; c.lineWidth = 2;
+    c.beginPath(); c.arc(x - 7, y + 1, 7, 0, TAU); c.arc(x + 7, y + 1, 7, 0, TAU); c.arc(x, y - 4, 9, 0, TAU); c.fill();
+    c.beginPath(); c.arc(x, y - 4, 9, Math.PI, 0); c.stroke(); }
+  _tree(x, y, s = 1) { const c = this.ctx, T = CONFIG.art.tree;
+    c.fillStyle = CONFIG.art.shadow; c.beginPath(); c.ellipse(x, y + 14 * s, 18 * s, 6 * s, 0, 0, TAU); c.fill();
+    c.fillStyle = T.trunk; c.strokeStyle = T.trunkDark; c.lineWidth = 2; this._rr(x - 4 * s, y - 2 * s, 8 * s, 18 * s, 3 * s); c.fill(); c.stroke();
+    c.fillStyle = T.leaf; c.strokeStyle = T.leafDark;
+    c.beginPath(); c.arc(x - 10 * s, y - 6 * s, 11 * s, 0, TAU); c.arc(x + 10 * s, y - 6 * s, 11 * s, 0, TAU); c.arc(x, y - 18 * s, 14 * s, 0, TAU); c.fill();
+    c.beginPath(); c.arc(x, y - 18 * s, 14 * s, 0, TAU); c.stroke();
+    c.fillStyle = T.leafHi; c.beginPath(); c.arc(x - 5 * s, y - 21 * s, 5 * s, 0, TAU); c.fill(); }
+
+  /* ---- Player: simple cartoon human, oversized head, strong silhouette ---- */
   player(p) {
-    const { ctx, camera } = this, s = camera.worldToScreen(p.x, p.y);
-    // squash & stretch along velocity direction
-    const r = p.speedRatio, ang = Math.atan2(p.vy, p.vx);
-    const sx = 1 + r * CONFIG.player.squash, sy = 1 - r * CONFIG.player.squash;
+    const { ctx, camera } = this, s = camera.worldToScreen(p.x, p.y), R = p.radius, P = CONFIG.art.player, t = p.animTime;
+    const moving = p.speedRatio > 0.12;
+    const bob = moving ? Math.abs(Math.sin(t * 11)) * 2.5 : Math.sin(t * 2.5) * 1.2;
+    const legSw = moving ? Math.sin(t * 11) * R * 0.28 : 0;
+    const sr = p.speedRatio, sx = 1 + sr * CONFIG.player.squash, sy = 1 - sr * CONFIG.player.squash;
+    const flash = p.hitFlash > 0, col = (b) => flash ? "#ffffff" : b;
+
+    // ground shadow (unscaled)
+    ctx.fillStyle = CONFIG.art.shadow; ctx.beginPath(); ctx.ellipse(s.x, s.y + R * 1.35, R * 0.95, R * 0.38, 0, 0, TAU); ctx.fill();
+
     ctx.save();
-    ctx.translate(s.x, s.y); ctx.rotate(ang); ctx.scale(sx, sy);
-    ctx.shadowColor = CONFIG.player.color; ctx.shadowBlur = 18;
-    ctx.fillStyle = p.hitFlash > 0 ? "#ffffff" : CONFIG.player.color;
-    ctx.beginPath(); ctx.arc(0, 0, p.radius, 0, TAU); ctx.fill();
+    ctx.translate(s.x, s.y - bob);
+    ctx.scale(p.facing * sx, sy);
+    ctx.lineJoin = "round"; ctx.lineWidth = 2.4; ctx.strokeStyle = CONFIG.art.outline;
+
+    // boots
+    ctx.fillStyle = col(P.boots);
+    this._rr(-R * 0.62, R * 0.78 + legSw, R * 0.5, R * 0.55, R * 0.18); ctx.fill(); ctx.stroke();
+    this._rr( R * 0.12, R * 0.78 - legSw, R * 0.5, R * 0.55, R * 0.18); ctx.fill(); ctx.stroke();
+    // body (outfit) + darker lower half
+    ctx.fillStyle = col(P.outfit); this._rr(-R * 0.66, -R * 0.1, R * 1.32, R * 1.05, R * 0.42); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = col(P.outfitDark); this._rr(-R * 0.66, R * 0.5, R * 1.32, R * 0.45, R * 0.42); ctx.fill();
+    // hands
+    ctx.fillStyle = col(P.skin);
+    ctx.beginPath(); ctx.arc(-R * 0.8, R * 0.25 + legSw * 0.5, R * 0.26, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc( R * 0.8, R * 0.25 - legSw * 0.5, R * 0.26, 0, TAU); ctx.fill(); ctx.stroke();
+    // hair (behind head, peeks over the top)
+    const hy = -R * 0.55, hr = R * 0.92;
+    ctx.fillStyle = col(P.hair); ctx.beginPath(); ctx.arc(0, hy - hr * 0.3, hr * 0.98, 0, TAU); ctx.fill(); ctx.stroke();
+    // head
+    ctx.fillStyle = col(P.skin); ctx.beginPath(); ctx.arc(0, hy, hr, 0, TAU); ctx.fill(); ctx.stroke();
+    // eyes (toward facing front = +x)
+    if (!flash) { ctx.fillStyle = "#22303f";
+      ctx.beginPath(); ctx.arc(hr * 0.28, hy + hr * 0.12, R * 0.11, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(hr * 0.62, hy + hr * 0.12, R * 0.11, 0, TAU); ctx.fill(); }
     ctx.restore();
-    ctx.fillStyle = "rgba(255,255,255,.35)";
-    ctx.beginPath(); ctx.arc(s.x - 4, s.y - 4, p.radius * 0.4, 0, TAU); ctx.fill();
   }
 
+  /* ---- Sword: original heroic-minimalist fantasy blade ---- */
   sword(sw) {
-    const { ctx, camera } = this;
-    for (const t of sw.trail) {
-      const a = clamp(t.life / CONFIG.sword.trailLife, 0, 1), s = camera.worldToScreen(t.x, t.y);
-      ctx.fillStyle = `rgba(160,210,255,${a * 0.5})`;
-      ctx.beginPath(); ctx.arc(s.x, s.y, sw.width * 0.5 * a, 0, TAU); ctx.fill();
+    const { ctx, camera } = this, S = CONFIG.art.sword, L = sw.length, W = sw.width;
+    // glowing trail
+    for (const tr of sw.trail) {
+      const a = clamp(tr.life / CONFIG.sword.trailLife, 0, 1), s = camera.worldToScreen(tr.x, tr.y);
+      ctx.fillStyle = `rgba(170,215,255,${a * 0.5})`; ctx.beginPath(); ctx.arc(s.x, s.y, W * 0.5 * a, 0, TAU); ctx.fill();
     }
     const base = camera.worldToScreen(sw.base().x, sw.base().y);
     ctx.save();
     ctx.translate(base.x, base.y); ctx.rotate(sw.angle);
-    ctx.shadowColor = "#9fd0ff"; ctx.shadowBlur = 12;
-    ctx.fillStyle = CONFIG.sword.color;
-    ctx.fillRect(0, -sw.width / 2, sw.length, sw.width);
+    ctx.lineJoin = "round"; ctx.lineWidth = 2; ctx.strokeStyle = CONFIG.art.outline;
+    const grip = L * 0.2;
+    // pommel
+    ctx.fillStyle = S.guard; ctx.beginPath(); ctx.arc(-grip - W * 0.25, 0, W * 0.34, 0, TAU); ctx.fill(); ctx.stroke();
+    // leather grip + binding
+    ctx.fillStyle = S.grip; this._rr(-grip, -W * 0.28, grip, W * 0.56, W * 0.2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = S.gripBind; ctx.lineWidth = 1.5;
+    for (let i = 1; i < 3; i++) { const gx = -grip + (grip * i) / 3; ctx.beginPath(); ctx.moveTo(gx, -W * 0.26); ctx.lineTo(gx, W * 0.26); ctx.stroke(); }
+    ctx.strokeStyle = CONFIG.art.outline; ctx.lineWidth = 2;
+    // crossguard
+    ctx.fillStyle = S.guard; this._rr(-W * 0.16, -W * 0.95, W * 0.5, W * 1.9, W * 0.2); ctx.fill(); ctx.stroke();
+    // blade (clean, tapered to a point)
+    const b0 = W * 0.34, bw = W * 0.5;
+    ctx.fillStyle = S.blade;
     ctx.beginPath();
-    ctx.moveTo(sw.length, -sw.width / 2); ctx.lineTo(sw.length + 12, 0); ctx.lineTo(sw.length, sw.width / 2);
-    ctx.closePath(); ctx.fill();
+    ctx.moveTo(b0, -bw); ctx.lineTo(L - W * 0.2, -bw * 0.55); ctx.lineTo(L + W * 0.6, 0);
+    ctx.lineTo(L - W * 0.2, bw * 0.55); ctx.lineTo(b0, bw); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // polished centre highlight (fuller)
+    ctx.strokeStyle = S.edge; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(b0 + 2, -bw * 0.18); ctx.lineTo(L - W * 0.1, 0); ctx.stroke();
     ctx.restore();
   }
 
+  /* ---- Enemy: cartoon blob, big eyes, distinct silhouette per type ---- */
   enemy(e) {
     const { ctx, camera } = this, s = camera.worldToScreen(e.x, e.y);
-    let r = e.radius + (e.squash > 0 ? e.squash * 6 : 0);
-    let alpha = 1;
-    if (e.dying) { // death anim: expand + fade
-      const k = 1 - e.deathT / CONFIG.fx.deathAnim;
-      r = e.radius * (1 + k * 0.8); alpha = 1 - k;
-    }
+    let grow = 1, alpha = 1;
+    if (e.dying) { const k = 1 - e.deathT / CONFIG.fx.deathAnim; grow = 1 + k * 0.6; alpha = 1 - k; }
+    const wob = Math.sin(e.animTime * 6) * 0.05 + (e.squash > 0 ? e.squash * 0.5 : 0);
+    const R = e.baseRadius * grow, flash = e.hitFlash > 0, col = flash ? "#ffffff" : e.color;
+
+    // shadow
+    ctx.globalAlpha = alpha * 0.18; ctx.fillStyle = "#000";
+    ctx.beginPath(); ctx.ellipse(s.x, s.y + R * 0.9, R * 0.9, R * 0.34, 0, 0, TAU); ctx.fill();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = e.hitFlash > 0 ? "#ffffff" : e.color;
-    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill();
+
+    ctx.save();
+    ctx.translate(s.x, s.y); ctx.scale(1 + wob, 1 - wob);
+    ctx.lineJoin = "round"; ctx.lineWidth = 2.5; ctx.strokeStyle = "rgba(20,22,32,.4)"; ctx.fillStyle = col;
+
+    if (e.type === "tank") {                 // bulky rounded square
+      this._rr(-R * 0.95, -R * 0.95, R * 1.9, R * 1.9, R * 0.55); ctx.fill(); ctx.stroke();
+    } else if (e.type === "fast") {          // round body + two pointy ears
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.9, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-R * 0.7, -R * 0.5); ctx.lineTo(-R * 1.1, -R * 1.35); ctx.lineTo(-R * 0.15, -R * 0.85); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo( R * 0.7, -R * 0.5); ctx.lineTo( R * 1.1, -R * 1.35); ctx.lineTo( R * 0.15, -R * 0.85); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {                                  // normal / ranged round body
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.95, 0, TAU); ctx.fill(); ctx.stroke();
+    }
+
+    if (!e.dying) {                           // faces with big eyes
+      if (e.type === "ranged") {              // single cyclops eye
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, -R * 0.05, R * 0.42, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#1b2330"; ctx.beginPath(); ctx.arc(0, -R * 0.05, R * 0.2, 0, TAU); ctx.fill();
+      } else {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(-R * 0.32, -R * 0.08, R * 0.27, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc( R * 0.32, -R * 0.08, R * 0.27, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#1b2330";
+        ctx.beginPath(); ctx.arc(-R * 0.28, -R * 0.04, R * 0.12, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc( R * 0.36, -R * 0.04, R * 0.12, 0, TAU); ctx.fill();
+      }
+    }
+    ctx.restore();
     ctx.globalAlpha = 1;
+
+    // HP pip (rounded)
     if (!e.dying && e.hp < e.maxHP) {
-      const w = e.radius * 2, frac = clamp(e.hp / e.maxHP, 0, 1);
-      ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(s.x - e.radius, s.y - e.radius - 7, w, 3);
-      ctx.fillStyle = "#7CFF8A"; ctx.fillRect(s.x - e.radius, s.y - e.radius - 7, w * frac, 3);
+      const w = e.baseRadius * 2, frac = clamp(e.hp / e.maxHP, 0, 1);
+      ctx.fillStyle = "rgba(0,0,0,.45)"; this._rr(s.x - e.baseRadius, s.y - e.baseRadius - 11, w, 4, 2); ctx.fill();
+      ctx.fillStyle = "#7CFF8A"; this._rr(s.x - e.baseRadius, s.y - e.baseRadius - 11, w * frac, 4, 2); ctx.fill();
     }
   }
 
+  /* ---- XP orb: glowing coin-like pickup ---- */
   orb(o) {
-    const { ctx, camera } = this, s = camera.worldToScreen(o.x, o.y);
-    const r = (o.radius + Math.sin(o.bob) * 1.6) * o.scale;
+    const { ctx, camera } = this, s = camera.worldToScreen(o.x, o.y), r = (o.radius + Math.sin(o.bob) * 1.6) * o.scale;
     ctx.save(); ctx.shadowColor = "#ffd23f"; ctx.shadowBlur = 12;
-    ctx.fillStyle = "#ffd23f";
-    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#ffd23f"; ctx.strokeStyle = "#c79a1f"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill(); ctx.stroke();
     ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.beginPath(); ctx.arc(s.x - r * 0.3, s.y - r * 0.3, r * 0.3, 0, TAU); ctx.fill();
   }
 
   particles(ps) {
     const { ctx, camera } = this;
     for (const p of ps.particles) {
       const s = camera.worldToScreen(p.x, p.y), a = clamp(p.life / p.maxLife, 0, 1);
-      ctx.globalAlpha = a; ctx.fillStyle = p.color;
-      ctx.beginPath(); ctx.arc(s.x, s.y, p.size, 0, TAU); ctx.fill();
+      ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(s.x, s.y, p.size, 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = 1; ctx.textAlign = "center";
     for (const t of ps.texts) {
       const s = camera.worldToScreen(t.x, t.y), a = clamp(t.life / t.maxLife, 0, 1);
-      ctx.globalAlpha = a; ctx.fillStyle = t.color;
-      ctx.font = `bold ${Math.round(14 * t.scale)}px Segoe UI, sans-serif`;
-      ctx.fillText(t.text, s.x, s.y);
+      ctx.globalAlpha = a; ctx.fillStyle = t.color; ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.5)";
+      ctx.font = `800 ${Math.round(15 * t.scale)}px "Baloo 2", Segoe UI, sans-serif`;
+      ctx.strokeText(t.text, s.x, s.y); ctx.fillText(t.text, s.x, s.y);
     }
     ctx.globalAlpha = 1; ctx.textAlign = "start";
   }
 }
 
 /* =========================================================================
-   UI — HUD + overlays + wave banner. DOM-driven, with tween helpers.
+   UI — HUD + overlays + wave banner with tween helpers.
    ========================================================================= */
 class UI {
   constructor(game) {
@@ -625,8 +696,7 @@ class UI {
       hp: document.getElementById("hp-fill"), xp: document.getElementById("xp-fill"),
       level: document.getElementById("level"), fps: document.getElementById("fps"),
       kills: document.getElementById("kills"), coins: document.getElementById("coins"),
-      wave: document.getElementById("wave-num"),
-      cards: document.getElementById("cards"),
+      wave: document.getElementById("wave-num"), cards: document.getElementById("cards"),
       levelup: document.getElementById("overlay-levelup"), pause: document.getElementById("overlay-pause"),
       gameover: document.getElementById("overlay-gameover"), goSummary: document.getElementById("go-summary"),
       banner: document.getElementById("banner"),
@@ -636,19 +706,14 @@ class UI {
     document.getElementById("resume-btn").onclick = () => game.togglePause();
     document.getElementById("restart-btn").onclick = () => game.restart();
   }
-  // re-trigger a CSS "pop" animation on an element
   _pop(el) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
-
   update(fps) {
     const g = this.game, p = g.player;
     this.el.hp.style.width = (p.hp / p.maxHP * 100) + "%";
     this.el.xp.style.width = (g.xp / g.xpNeeded * 100) + "%";
-    this.el.level.textContent = g.level;
-    this.el.fps.textContent = Math.round(fps);
-    this.el.kills.textContent = g.kills;
-    this.el.coins.textContent = g.coins;
+    this.el.level.textContent = g.level; this.el.fps.textContent = Math.round(fps);
+    this.el.kills.textContent = g.kills; this.el.coins.textContent = g.coins;
     this.el.wave.textContent = g.waves.wave || 1;
-    // pop animations when counters change
     if (g.kills !== this._lastKills) { this._pop(this.el.kills); this._lastKills = g.kills; }
     if (g.coins !== this._lastCoins) { this._pop(this.el.coins); this._lastCoins = g.coins; }
     if ((g.waves.wave || 1) !== this._lastWave) { this._pop(this.el.wave); this._lastWave = g.waves.wave || 1; }
@@ -669,9 +734,8 @@ class UI {
     });
     this.el.levelup.classList.add("show");
   }
-  // play a brief selection animation, then commit the choice
   _selectCard(card, i) {
-    if (card.classList.contains("selected")) return;
+    if (!card || card.classList.contains("selected")) return;
     [...this.el.cards.children].forEach(c => c.style.pointerEvents = "none");
     card.classList.add("selected");
     setTimeout(() => this.game.chooseUpgrade(i), 150);
@@ -683,14 +747,13 @@ class UI {
 }
 
 /* =========================================================================
-   Game — orchestrator. Owns loop, state, systems, pools, and combat rules.
+   Game — orchestrator. Owns loop, state, systems, pools, combat rules.
    ========================================================================= */
 const STATE = { PLAYING: "PLAYING", LEVELUP: "LEVELUP", PAUSED: "PAUSED", GAMEOVER: "GAMEOVER" };
 
 class Game {
   constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+    this.canvas = canvas; this.ctx = canvas.getContext("2d");
     this.input = new Input(canvas);
     this.camera = new Camera(canvas);
     this.renderer = new Renderer(this.ctx, this.camera);
@@ -698,14 +761,10 @@ class Game {
     this.upgrades = new UpgradeSystem(this);
     this.waves = new WaveSystem(this);
     this.ui = new UI(this);
-
-    // object pools (enemies, xp orbs) — particles/text pooled inside ParticleSystem
     this.enemyPool = new Pool(() => new Enemy());
     this.orbPool = new Pool(() => new XPOrb());
 
-    this._resize();
-    addEventListener("resize", () => this._resize());
-
+    this._resize(); addEventListener("resize", () => this._resize());
     this.input.onSelect = (i) => { if (this.state === STATE.LEVELUP) this.ui._selectCard(this.ui.el.cards.children[i], i); };
     addEventListener("keydown", (e) => {
       if (e.code === "KeyP" || e.code === "Escape") { if (this.state === STATE.PLAYING || this.state === STATE.PAUSED) this.togglePause(); }
@@ -731,10 +790,8 @@ class Game {
   }
   _resize() { this.canvas.width = innerWidth; this.canvas.height = innerHeight; }
 
-  /* ---- spawning via pools ---- */
   spawnEnemy(typeKey) {
-    const c = this.camera, w = c.canvas.width, h = c.canvas.height, pad = 60;
-    const side = Math.floor(rand(0, 4));
+    const c = this.camera, w = c.canvas.width, h = c.canvas.height, pad = 60, side = Math.floor(rand(0, 4));
     let sx, sy;
     if (side === 0) { sx = rand(0, w); sy = -pad; }
     else if (side === 1) { sx = w + pad; sy = rand(0, h); }
@@ -745,7 +802,6 @@ class Game {
   }
   spawnOrb(x, y, value) { this.orbs.push(this.orbPool.acquire().init(x, y, value)); }
 
-  /* ---- state transitions ---- */
   togglePause() {
     if (this.state === STATE.PLAYING) { this.state = STATE.PAUSED; this.ui.showPause(true); }
     else if (this.state === STATE.PAUSED) { this.state = STATE.PLAYING; this.ui.showPause(false); this.last = performance.now(); }
@@ -753,74 +809,54 @@ class Game {
   restart() { this.ui.hideGameOver(); this.ui.showPause(false); this.reset(); this.last = performance.now(); }
 
   levelUp() {
-    this.level++;
-    this.xp -= this.xpNeeded;
+    this.level++; this.xp -= this.xpNeeded;
     this.xpNeeded = CONFIG.xp.perLevelBase + (this.level - 1) * CONFIG.xp.perLevelGrowth;
-    this.state = STATE.LEVELUP;
-    this._choices = this.upgrades.roll();
-    this.ui.showLevelUp(this._choices);
+    this.state = STATE.LEVELUP; this._choices = this.upgrades.roll(); this.ui.showLevelUp(this._choices);
   }
   chooseUpgrade(i) {
     if (this.state !== STATE.LEVELUP || !this._choices[i]) return;
-    this._choices[i].apply();
-    this.ui.hideLevelUp();
+    this._choices[i].apply(); this.ui.hideLevelUp();
     if (this.xp >= this.xpNeeded) this.levelUp();
     else { this.state = STATE.PLAYING; this.last = performance.now(); }
   }
   gainXP(n) {
-    this.xp += n;
-    this.coins += n + this.player.coinBonus;
+    this.xp += n; this.coins += n + this.player.coinBonus;
     if (this.xp >= this.xpNeeded && this.state === STATE.PLAYING) this.levelUp();
   }
 
-  /* ---- combat: single place that resolves a sword hit (crit/kb/juice) ---- */
   _resolveSwordHit(e) {
     const crit = Math.random() < this.player.critChance;
     const dmg = crit ? this.sword.damage * CONFIG.combat.critMult : this.sword.damage;
-    e.hurt(dmg);
-    e.hitCooldown = CONFIG.combat.hitCooldown;
-    // knockback away from player
+    e.hurt(dmg); e.hitCooldown = CONFIG.combat.hitCooldown;
     const dx = e.x - this.player.x, dy = e.y - this.player.y, d = Math.hypot(dx, dy) || 1;
     e.applyKnockback(dx / d, dy / d, CONFIG.combat.knockback);
-    // juice: damage number, particles, hit stop, shake
-    this.particles.floatText(e.x, e.y - e.radius, Math.round(dmg) + (crit ? "!" : ""),
-                             crit ? "#ff6f3c" : "#ffffff", crit ? 1.6 : 1.0);
+    this.particles.floatText(e.x, e.y - e.radius, Math.round(dmg) + (crit ? "!" : ""), crit ? "#ff7a3c" : "#ffffff", crit ? 1.6 : 1.0);
     this.particles.burst(e.x, e.y, "#ffd2d8", crit ? 8 : 4, crit ? 180 : 120);
     this.hitStop = Math.max(this.hitStop, CONFIG.combat.hitStop);
     this.camera.addShake(crit ? 5 : 2);
     if (e.dying) this._onEnemyDeath(e);
   }
   _onEnemyDeath(e) {
-    this.kills++;
-    this.camera.addShake(5);
+    this.kills++; this.camera.addShake(5);
     this.particles.burst(e.x, e.y, e.color, 16, 240);
     this.spawnOrb(e.x, e.y, CONFIG.xp.value);
   }
 
-  /* ---- update ---- */
   update(dt) {
     const dir = this.input.getMoveVector(this.player, this.camera);
-    this.player.update(dt, dir);
-    this.sword.update(dt);
-    this.camera.follow(this.player, dt);
-    this.waves.update(dt);
+    this.player.update(dt, dir); this.sword.update(dt); this.camera.follow(this.player, dt); this.waves.update(dt);
 
     const base = this.sword.base(), tip = this.sword.tip(), reach = this.sword.width / 2;
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       e.update(dt, this.player);
       if (!e.dying) {
-        if (e.hitCooldown <= 0 && Collision.segCircle(base.x, base.y, tip.x, tip.y, e.x, e.y, e.radius + reach))
-          this._resolveSwordHit(e);
-        if (!e.dying && Collision.circles(e.x, e.y, e.radius, this.player.x, this.player.y, this.player.radius))
-          this.player.damage(e.contactDPS * dt);
+        if (e.hitCooldown <= 0 && Collision.segCircle(base.x, base.y, tip.x, tip.y, e.x, e.y, e.radius + reach)) this._resolveSwordHit(e);
+        if (!e.dying && Collision.circles(e.x, e.y, e.radius, this.player.x, this.player.y, this.player.radius)) this.player.damage(e.contactDPS * dt);
       }
       if (e.dead) { this.enemies.splice(i, 1); this.enemyPool.release(e); }
     }
-
-    // XP orbs: update, merge nearby, collect
     this._updateOrbs(dt);
-
     this.particles.update(dt);
     if (this.player.hp <= 0) this._gameOver();
   }
@@ -830,12 +866,9 @@ class Game {
     for (let i = this.orbs.length - 1; i >= 0; i--) {
       const o = this.orbs[i];
       o.update(dt, this.player);
-      // merge: fold a close-enough later orb into this one (cheap, n is small)
       for (let j = i - 1; j >= 0; j--) {
         const b = this.orbs[j];
-        if (!b.collected && Math.hypot(o.x - b.x, o.y - b.y) < md) {
-          b.value += o.value; o.collected = true; break;
-        }
+        if (!b.collected && Math.hypot(o.x - b.x, o.y - b.y) < md) { b.value += o.value; o.collected = true; break; }
       }
       if (o.collected) {
         this.gainXP(o.value);
@@ -850,10 +883,9 @@ class Game {
     this.ui.showGameOver(`Wave ${this.waves.wave} · Level ${this.level} · ${this.kills} kills · ${this.coins} coins`);
   }
 
-  /* ---- render ---- */
   render() {
     const r = this.renderer;
-    r.clear(); r.grid();
+    r.environment();
     for (const o of this.orbs) r.orb(o);
     for (const e of this.enemies) r.enemy(e);
     r.sword(this.sword);
@@ -861,21 +893,13 @@ class Game {
     r.particles(this.particles);
   }
 
-  /* ---- main loop (delta-time, with hit-stop) ---- */
   loop(now) {
-    let dt = (now - this.last) / 1000; this.last = now;
-    dt = clamp(dt, 0, 0.05);
-
+    let dt = (now - this.last) / 1000; this.last = now; dt = clamp(dt, 0, 0.05);
     this._fpsAccum += dt; this._fpsFrames++;
     if (this._fpsAccum >= 0.25) { this.fps = this._fpsFrames / this._fpsAccum; this._fpsAccum = 0; this._fpsFrames = 0; }
-
-    if (this.hitStop > 0) {
-      this.hitStop -= dt;            // freeze simulation briefly for impact
-    } else if (this.state === STATE.PLAYING) {
-      this.update(dt);
-    }
-    this.render();
-    this.ui.update(this.fps);
+    if (this.hitStop > 0) this.hitStop -= dt;
+    else if (this.state === STATE.PLAYING) this.update(dt);
+    this.render(); this.ui.update(this.fps);
     requestAnimationFrame((t) => this.loop(t));
   }
 }
